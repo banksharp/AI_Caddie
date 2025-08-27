@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database connection (update with your PostgreSQL password)
-DATABASE_URL = "postgresql://postgres:POSTadmin@localhost/golf_caddie"
+DATABASE_URL = "postgresql://postgres:RedBrickBong420@localhost/golf_caddie"
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
