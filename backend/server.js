@@ -88,6 +88,16 @@ app.post('/api/login', async (req, res) => {
 
 // ── Protected routes ──
 
+app.get('/api/me', authenticate, async (req, res) => {
+  try {
+    const user = await currentUser(req, res);
+    if (!user) return;
+    return res.json({ email: user.email, clubs: user.clubs || {} });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
 app.post('/api/setup-clubs', authenticate, async (req, res) => {
   try {
     const user = await currentUser(req, res);
