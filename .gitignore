@@ -1,0 +1,58 @@
+# ---- Secrets / environment ----
+.env
+.env.*
+*.env
+env.txt
+
+# Keys / certificates
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.der
+
+# Common secret filename patterns
+secrets.*
+secret.*
+credentials.*
+apikey*
+api_key*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+.Python
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Caches / tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Build artifacts
+build/
+dist/
+
+# ---- Notebooks ----
+.ipynb_checkpoints/
+
+# ---- IDE / OS ----
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
