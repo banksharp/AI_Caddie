@@ -123,7 +123,7 @@ app.post('/api/club-recommendation', authenticate, async (req, res) => {
     Also provide any tips for executing this shot successfully.`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-20250219',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -164,7 +164,7 @@ app.post('/api/course-strategy', authenticate, async (req, res) => {
     5. Any specific shot shapes that would be beneficial`;
 
     const response = await anthropic.messages.create({
-      model: 'claude-3-7-sonnet-20250219',
+      model: 'claude-3-5-sonnet-20241022',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }],
     });
