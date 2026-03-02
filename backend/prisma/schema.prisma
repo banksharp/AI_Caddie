@@ -1,0 +1,46 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int     @id @default(autoincrement())
+  email        String  @unique
+  passwordHash String  @map("password_hash")
+  clubs        Json?   @default("{}")
+  rounds       Round[]
+
+  @@map("users")
+}
+
+model Round {
+  id         Int      @id @default(autoincrement())
+  userId     Int      @map("user_id")
+  courseName String?  @map("course_name")
+  startedAt  DateTime @default(now()) @map("started_at") @db.Timestamptz
+  totalScore Int?     @map("total_score")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holes Hole[]
+
+  @@map("rounds")
+}
+
+model Hole {
+  id         Int      @id @default(autoincrement())
+  roundId    Int      @map("round_id")
+  holeNumber Int      @map("hole_number")
+  strokes    Int
+  putts      Int?
+  fairwayHit Boolean? @map("fairway_hit")
+  gir        Boolean?
+  notes      String?
+
+  round Round @relation(fields: [roundId], references: [id], onDelete: Cascade)
+
+  @@map("holes")
+}
