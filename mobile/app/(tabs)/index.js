@@ -125,27 +125,58 @@ export default function CaddieScreen() {
               </View>
             ) : (
               <View style={{ gap: 14 }}>
-                <View>
-                  <Text style={s.sectionTitle}>Tee shot</Text>
-                  <Text style={s.kv}>Club: <Text style={s.kvStrong}>{result.data.teeShot?.club || '-'}</Text></Text>
-                  <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{result.data.teeShot?.aim || '-'}</Text></Text>
-                  {!!result.data.teeShot?.shape && (
-                    <Text style={s.kv}>Shape: <Text style={s.kvStrong}>{result.data.teeShot.shape}</Text></Text>
-                  )}
-                  {!!result.data.teeShot?.notes && <Text style={s.note}>{result.data.teeShot.notes}</Text>}
-                </View>
+                {result.data.teeShot && (
+                  <View>
+                    <Text style={s.sectionTitle}>Tee shot</Text>
+                    <Text style={s.kv}>Club: <Text style={s.kvStrong}>{result.data.teeShot.club || '-'}</Text></Text>
+                    <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{result.data.teeShot.aim || '-'}</Text></Text>
+                    {!!result.data.teeShot.shape && (
+                      <Text style={s.kv}>Shape: <Text style={s.kvStrong}>{result.data.teeShot.shape}</Text></Text>
+                    )}
+                    {!!result.data.teeShot.notes && <Text style={s.note}>{result.data.teeShot.notes}</Text>}
+                  </View>
+                )}
 
-                <View>
-                  <Text style={s.sectionTitle}>Approach</Text>
-                  <Text style={s.kv}>Club: <Text style={s.kvStrong}>{result.data.approach?.club || '-'}</Text></Text>
-                  <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{result.data.approach?.aim || '-'}</Text></Text>
-                  {!!result.data.approach?.notes && <Text style={s.note}>{result.data.approach.notes}</Text>}
-                </View>
+                {result.data.secondShot && result.data.secondShot.club && (
+                  <View>
+                    <Text style={s.sectionTitle}>{result.data.secondShot.situation || 'Second shot'}</Text>
+                    <Text style={s.kv}>Club: <Text style={s.kvStrong}>{result.data.secondShot.club}</Text></Text>
+                    {!!result.data.secondShot.aim && <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{result.data.secondShot.aim}</Text></Text>}
+                    {!!result.data.secondShot.notes && <Text style={s.note}>{result.data.secondShot.notes}</Text>}
+                  </View>
+                )}
+
+                {(result.data.otherShots || []).filter((s) => s && (s.club || s.notes)).map((shot, idx) => (
+                  <View key={idx}>
+                    <Text style={s.sectionTitle}>{shot.situation || `Shot ${idx + 3}`}</Text>
+                    {!!shot.club && <Text style={s.kv}>Club: <Text style={s.kvStrong}>{shot.club}</Text></Text>}
+                    {!!shot.aim && <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{shot.aim}</Text></Text>}
+                    {!!shot.notes && <Text style={s.note}>{shot.notes}</Text>}
+                  </View>
+                ))}
+
+                {result.data.approach && (
+                  <View>
+                    <Text style={s.sectionTitle}>Approach to green</Text>
+                    <Text style={s.kv}>Club: <Text style={s.kvStrong}>{result.data.approach.club || '-'}</Text></Text>
+                    <Text style={s.kv}>Aim: <Text style={s.kvStrong}>{result.data.approach.aim || '-'}</Text></Text>
+                    {!!result.data.approach.notes && <Text style={s.note}>{result.data.approach.notes}</Text>}
+                  </View>
+                )}
 
                 {!!(result.data.avoid || []).length && (
                   <View>
                     <Text style={s.sectionTitle}>Avoid</Text>
                     {(result.data.avoid || []).map((t, idx) => (
+                      <Text key={idx} style={s.bullet}>• {t}</Text>
+                    ))}
+                  </View>
+                )}
+
+                {!!(result.data.notes || []).length && (
+                  <View>
+                    <Text style={s.sectionTitle}>Notes</Text>
+                    {(result.data.notes || []).map((t, idx) => (
                       <Text key={idx} style={s.bullet}>• {t}</Text>
                     ))}
                   </View>
