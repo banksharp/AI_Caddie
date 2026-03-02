@@ -110,6 +110,21 @@ app.post('/api/setup-clubs', authenticate, async (req, res) => {
   }
 });
 
+function maybeParseModelJson(text) {
+  if (typeof text !== 'string') return null;
+  const trimmed = text.trim();
+  const withoutFences = trimmed
+    .replace(/^```(json)?/i, '')
+    .replace(/```$/i, '')
+    .trim();
+
+  try {
+    return JSON.parse(withoutFences);
+  } catch {
+    return null;
+  }
+}
+
 app.post('/api/club-recommendation', authenticate, async (req, res) => {
   try {
     const user = await currentUser(req, res);
@@ -129,8 +144,13 @@ app.post('/api/club-recommendation', authenticate, async (req, res) => {
     - Current lie: ${lie}
     - Wind conditions: ${wind}
 
-    Please recommend the best club for this shot and explain your reasoning.
-    Also provide any tips for executing this shot successfully.`;
+    Return ONLY valid JSON with this exact shape (no markdown, no extra keys):
+    {
+      "recommendedClub": "7-Iron",
+      "why": ["bullet 1", "bullet 2"],
+      "tips": ["tip 1", "tip 2"],
+      "adjustments": ["optional bullet 1"]
+    }`;
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
@@ -138,7 +158,10 @@ app.post('/api/club-recommendation', authenticate, async (req, res) => {
       messages: [{ role: 'user', content: prompt }],
     });
 
-    return res.json({ advice: response.content[0].text, status: 'success' });
+    const raw = response.content[0].text;
+    const parsed = maybeParseModelJson(raw);
+    if (parsed) return res.json({ data: parsed, status: 'success' });
+    return res.json({ advice: raw, status: 'success', format: 'text' });
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
@@ -166,12 +189,13 @@ app.post('/api/course-strategy', authenticate, async (req, res) => {
     for (const [club, dist] of Object.entries(user.clubs)) {
       prompt += `${club}: ${dist} yards\n`;
     }
-    prompt += `Please provide a hole strategy that covers:
-    1. What club(s) to use off the tee
-    2. Where to aim for each shot
-    3. How to handle the approach to the green
-    4. What risks to avoid
-    5. Any specific shot shapes that would be beneficial`;
+    prompt += `Return ONLY valid JSON with this exact shape (no markdown, no extra keys):
+    {
+      "teeShot": {"club": "Driver", "aim": "left edge of fairway", "shape": "fade", "notes": "..." },
+      "approach": {"club": "8-Iron", "aim": "center of green", "notes": "..." },
+      "avoid": ["risk 1", "risk 2"],
+      "notes": ["bullet 1", "bullet 2"]
+    }`;
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
@@ -179,7 +203,10 @@ app.post('/api/course-strategy', authenticate, async (req, res) => {
       messages: [{ role: 'user', content: prompt }],
     });
 
-    return res.json({ advice: response.content[0].text, status: 'success' });
+    const raw = response.content[0].text;
+    const parsed = maybeParseModelJson(raw);
+    if (parsed) return res.json({ data: parsed, status: 'success' });
+    return res.json({ advice: raw, status: 'success', format: 'text' });
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
