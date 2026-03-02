@@ -189,15 +189,18 @@ app.post('/api/course-strategy', authenticate, async (req, res) => {
     for (const [club, dist] of Object.entries(user.clubs)) {
       prompt += `${club}: ${dist} yards\n`;
     }
-    prompt += `Return ONLY valid JSON (no markdown). Include every shot that applies to this hole.
-    Use this shape. For par 4/5 include secondShot and use otherShots for any extra shots (e.g. "100 yards out for 3rd shot", "layup", "pitch from 80 yards").
+    prompt += `Return ONLY valid JSON (no markdown). Plan shots in strict order: 1st (tee), 2nd, 3rd, ... last (approach onto green).
+    CRITICAL: Distances must be consistent. Each shot happens FROM the distance left after the previous shot.
+    If you say shot 2 "leaves 80 yards", then the next shot is FROM 80 yards, not from 135. If shot 2 "leaves 5-10 yards from green", the next shot is a short chip from 5-10 yards.
+    In "situation" or "notes" always state the distance for that shot (e.g. "From 195 yards" or "From 80 yards for 3rd shot"). "approach" = final shot onto the green from whatever distance the previous shot left.
+    Use this shape:
     {
       "teeShot": {"club": "...", "aim": "...", "shape": "optional", "notes": "..." },
-      "secondShot": {"situation": "e.g. Layup or 2nd shot", "club": "...", "aim": "...", "notes": "..." },
+      "secondShot": {"situation": "e.g. 2nd shot, 195 yards left", "club": "...", "aim": "...", "notes": "..." },
       "otherShots": [
-        {"situation": "e.g. 100 yards out for 3rd shot", "club": "...", "aim": "...", "notes": "..." }
+        {"situation": "e.g. 3rd shot from 80 yards", "club": "...", "aim": "...", "notes": "..." }
       ],
-      "approach": {"club": "...", "aim": "...", "notes": "..." },
+      "approach": {"club": "...", "aim": "...", "notes": "final shot onto green from X yards" },
       "avoid": ["risk 1", "risk 2"],
       "notes": ["bullet 1", "bullet 2"]
     }
