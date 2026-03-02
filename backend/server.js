@@ -189,13 +189,19 @@ app.post('/api/course-strategy', authenticate, async (req, res) => {
     for (const [club, dist] of Object.entries(user.clubs)) {
       prompt += `${club}: ${dist} yards\n`;
     }
-    prompt += `Return ONLY valid JSON with this exact shape (no markdown, no extra keys):
+    prompt += `Return ONLY valid JSON (no markdown). Include every shot that applies to this hole.
+    Use this shape. For par 4/5 include secondShot and use otherShots for any extra shots (e.g. "100 yards out for 3rd shot", "layup", "pitch from 80 yards").
     {
-      "teeShot": {"club": "Driver", "aim": "left edge of fairway", "shape": "fade", "notes": "..." },
-      "approach": {"club": "8-Iron", "aim": "center of green", "notes": "..." },
+      "teeShot": {"club": "...", "aim": "...", "shape": "optional", "notes": "..." },
+      "secondShot": {"situation": "e.g. Layup or 2nd shot", "club": "...", "aim": "...", "notes": "..." },
+      "otherShots": [
+        {"situation": "e.g. 100 yards out for 3rd shot", "club": "...", "aim": "...", "notes": "..." }
+      ],
+      "approach": {"club": "...", "aim": "...", "notes": "..." },
       "avoid": ["risk 1", "risk 2"],
       "notes": ["bullet 1", "bullet 2"]
-    }`;
+    }
+    Omit secondShot or use [] for otherShots if not needed. Always include teeShot, approach, avoid, and notes.`;
 
     const response = await anthropic.messages.create({
       model: 'claude-sonnet-4-5-20250929',
