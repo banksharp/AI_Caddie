@@ -1,5 +1,5 @@
 // Point this at your live Render URL once deployed
-const BASE_URL = 'https://YOUR-RENDER-URL.onrender.com';
+const BASE_URL = 'https://ai-caddie.onrender.com';
 
 let _token = null;
 
@@ -36,6 +36,10 @@ export async function login(email, password) {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+}
+
+export async function getProfile() {
+  return request('/api/me');
 }
 
 export async function setupClubs(clubs) {
