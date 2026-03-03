@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, KeyboardAvoidingView, Platform,
+  StyleSheet, Alert, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
 import * as api from '../src/api';
+
+const logo = require('../assets/icon.png');
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('');
@@ -35,8 +37,9 @@ export default function RegisterScreen() {
   return (
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={s.card}>
+        <Image source={logo} style={s.logoImage} />
         <Text style={s.logo}>Create Account</Text>
-        <Text style={s.subtitle}>Join AI Caddie and improve your game</Text>
+        <Text style={s.subtitle}>Join cAIddie and improve your game</Text>
 
         <TextInput
           style={s.input}
@@ -79,6 +82,7 @@ export default function RegisterScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2D6A4F', justifyContent: 'center', padding: 24 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 28, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
+  logoImage: { width: 120, height: 120, alignSelf: 'center', marginBottom: 12, borderRadius: 20 },
   logo: { fontSize: 28, fontWeight: '800', color: '#2D6A4F', textAlign: 'center' },
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 28 },
   input: { backgroundColor: '#F0F7F4', borderRadius: 10, padding: 14, fontSize: 16, color: '#1B4332', marginBottom: 14 },
