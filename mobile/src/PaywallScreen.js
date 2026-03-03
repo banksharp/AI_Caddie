@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,10 +8,34 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useIAP, getAvailablePurchases } from 'expo-iap';
 import { SUBSCRIPTION_PRODUCT_ID } from './constants';
 import * as api from './api';
 import { useSubscription } from './SubscriptionContext';
+
+let useIAP;
+let getAvailablePurchases;
+let iapAvailable = false;
+try {
+  const iap = require('expo-iap');
+  useIAP = iap.useIAP;
+  getAvailablePurchases = iap.getAvailablePurchases;
+  iapAvailable = true;
+} catch {
+  iapAvailable = false;
+}
+
+function useIAPSafe(options) {
+  if (iapAvailable && useIAP) {
+    return useIAP(options);
+  }
+  return {
+    connected: false,
+    subscriptions: [],
+    fetchProducts: async () => {},
+    requestPurchase: async () => {},
+    restorePurchases: async () => {},
+  };
+}
 
 export function PaywallScreen({ onSubscribed, title, subtitle }) {
   const { refreshSubscription } = useSubscription();
@@ -24,7 +48,6 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
       if (!transactionId) {
         Alert.alert('Error', 'Could not get transaction ID. Please try Restore.');
         return;
-        // Android: backend may need purchaseToken; we only verify Apple for now.
       }
       try {
         await api.verifySubscription(transactionId);
@@ -37,7 +60,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
     [refreshSubscription, onSubscribed]
   );
 
-  const { connected, subscriptions, fetchProducts, requestPurchase, restorePurchases } = useIAP({
+  const { connected, subscriptions, fetchProducts, requestPurchase, restorePurchases } = useIAPSafe({
     onPurchaseSuccess: handlePurchaseSuccess,
     onPurchaseError: (err) => {
       setPurchasing(false);
@@ -88,10 +111,12 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
     setRestoring(true);
     try {
       await restorePurchases();
-      const purchases = await getAvailablePurchases({
-        alsoPublishToEventListenerIOS: false,
-        onlyIncludeActiveItemsIOS: true,
-      });
+      const purchases = iapAvailable
+        ? await getAvailablePurchases({
+            alsoPublishToEventListenerIOS: false,
+            onlyIncludeActiveItemsIOS: true,
+          })
+        : [];
       const subscriptionPurchase = Array.isArray(purchases)
         ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
         : null;
@@ -102,7 +127,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
         onSubscribed?.();
         Alert.alert('Restored', 'Your subscription has been restored.');
       } else {
-        Alert.alert('No subscription found', 'We couldn’t find an active subscription for this account.');
+        Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this account.');
       }
     } catch (err) {
       Alert.alert('Restore failed', err.message || 'Could not restore purchases.');
@@ -136,11 +161,9 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           {purchasing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <>
-              <Text style={s.primaryBtnText}>
-                {price ? `Subscribe — ${price}/month` : 'Subscribe monthly'}
-              </Text>
-            </>
+            <Text style={s.primaryBtnText}>
+              {price ? `Subscribe — ${price}/month` : 'Subscribe monthly'}
+            </Text>
           )}
         </TouchableOpacity>
 
