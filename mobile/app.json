@@ -27,8 +27,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset",
-      "expo-iap"
+      "expo-asset"
     ],
     "extra": {
       "router": {},
