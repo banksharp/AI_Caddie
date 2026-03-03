@@ -34,6 +34,7 @@ model Hole {
   id         Int      @id @default(autoincrement())
   roundId    Int      @map("round_id")
   holeNumber Int      @map("hole_number")
+  par        Int?
   strokes    Int
   putts      Int?
   fairwayHit Boolean? @map("fairway_hit")
