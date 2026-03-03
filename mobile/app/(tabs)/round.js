@@ -10,10 +10,11 @@ export default function RoundScreen() {
   const [courseName, setCourseName] = useState('');
   const [holes, setHoles] = useState([]);
   const [totalScore, setTotalScore] = useState(null);
+  const [totalVsPar, setTotalVsPar] = useState(null);
 
   // Hole entry
+  const [par, setPar] = useState(4);
   const [strokes, setStrokes] = useState('');
-  const [putts, setPutts] = useState('');
   const [fairway, setFairway] = useState(false);
   const [gir, setGir] = useState(false);
   const [notes, setNotes] = useState('');
@@ -40,16 +41,16 @@ export default function RoundScreen() {
     try {
       const data = await api.addHole(roundId, {
         hole_number: holes.length + 1,
+        par,
         strokes: parseInt(strokes),
-        putts: putts ? parseInt(putts) : null,
         fairway_hit: fairway,
         gir,
         notes: notes || null,
       });
       setHoles(data.holes);
       setTotalScore(data.total_score);
+      setTotalVsPar(data.total_vs_par ?? null);
       setStrokes('');
-      setPutts('');
       setFairway(false);
       setGir(false);
       setNotes('');
@@ -60,11 +61,19 @@ export default function RoundScreen() {
     }
   }
 
+  function formatVsPar(v) {
+    if (v == null) return '-';
+    if (v === 0) return 'E';
+    if (v > 0) return `+${v}`;
+    return String(v);
+  }
+
   function endRound() {
     setRoundId(null);
     setCourseName('');
     setHoles([]);
     setTotalScore(null);
+    setTotalVsPar(null);
     Alert.alert('Round Complete', 'Your round has been saved!');
   }
 
@@ -86,23 +95,30 @@ export default function RoundScreen() {
     <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
       <View style={s.header}>
         <Text style={s.headerTitle}>{courseName}</Text>
-        {totalScore !== null && <Text style={s.headerScore}>Total: {totalScore}</Text>}
+        {totalScore !== null && (
+          <Text style={s.headerScore}>
+            Total: {totalScore}
+            {totalVsPar != null && ` (${formatVsPar(totalVsPar)})`}
+          </Text>
+        )}
       </View>
 
       {holes.length > 0 && (
         <View style={s.scorecard}>
           <View style={s.scRow}>
             <Text style={[s.scCell, s.scHeader]}>Hole</Text>
-            <Text style={[s.scCell, s.scHeader]}>Strokes</Text>
-            <Text style={[s.scCell, s.scHeader]}>Putts</Text>
+            <Text style={[s.scCell, s.scHeader]}>Par</Text>
+            <Text style={[s.scCell, s.scHeader]}>Score</Text>
+            <Text style={[s.scCell, s.scHeader]}>+/-</Text>
             <Text style={[s.scCell, s.scHeader]}>FW</Text>
             <Text style={[s.scCell, s.scHeader]}>GIR</Text>
           </View>
           {holes.map((h) => (
             <View key={h.hole_number} style={s.scRow}>
               <Text style={s.scCell}>{h.hole_number}</Text>
+              <Text style={s.scCell}>{h.par ?? '-'}</Text>
               <Text style={s.scCell}>{h.strokes}</Text>
-              <Text style={s.scCell}>{h.putts ?? '-'}</Text>
+              <Text style={[s.scCell, h.score_vs_par != null && h.score_vs_par > 0 && s.scCellOver]}>{formatVsPar(h.score_vs_par)}</Text>
               <Text style={s.scCell}>{h.fairway_hit ? '✓' : '-'}</Text>
               <Text style={s.scCell}>{h.gir ? '✓' : '-'}</Text>
             </View>
@@ -112,8 +128,19 @@ export default function RoundScreen() {
 
       <View style={s.card}>
         <Text style={s.cardTitle}>Hole {holes.length + 1}</Text>
+        <Text style={s.parLabel}>Par</Text>
+        <View style={s.parRow}>
+          {[3, 4, 5].map((p) => (
+            <TouchableOpacity
+              key={p}
+              style={[s.parBtn, par === p && s.parBtnActive]}
+              onPress={() => setPar(p)}
+            >
+              <Text style={[s.parBtnText, par === p && s.parBtnTextActive]}>{p}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
         <TextInput style={s.input} placeholder="Strokes *" placeholderTextColor="#8BA89A" keyboardType="numeric" value={strokes} onChangeText={setStrokes} />
-        <TextInput style={s.input} placeholder="Putts" placeholderTextColor="#8BA89A" keyboardType="numeric" value={putts} onChangeText={setPutts} />
 
         <View style={s.switchRow}>
           <Text style={s.switchLabel}>Fairway Hit</Text>
@@ -151,8 +178,15 @@ const s = StyleSheet.create({
   headerScore: { fontSize: 18, fontWeight: '700', color: '#2D6A4F' },
   scorecard: { backgroundColor: '#fff', borderRadius: 14, overflow: 'hidden', marginBottom: 16 },
   scRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#F0F7F4' },
-  scCell: { flex: 1, textAlign: 'center', paddingVertical: 10, fontSize: 14, color: '#1B4332' },
+  scCell: { flex: 1, textAlign: 'center', paddingVertical: 10, fontSize: 13, color: '#1B4332' },
+  scCellOver: { color: '#E63946', fontWeight: '700' },
   scHeader: { fontWeight: '700', backgroundColor: '#2D6A4F', color: '#fff' },
+  parLabel: { fontSize: 14, fontWeight: '600', color: '#1B4332', marginBottom: 8 },
+  parRow: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+  parBtn: { flex: 1, backgroundColor: '#F0F7F4', borderRadius: 10, paddingVertical: 12, alignItems: 'center' },
+  parBtnActive: { backgroundColor: '#2D6A4F' },
+  parBtnText: { fontSize: 16, fontWeight: '700', color: '#6B7280' },
+  parBtnTextActive: { color: '#fff' },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   cardTitle: { fontSize: 18, fontWeight: '700', color: '#1B4332', marginBottom: 14 },
   input: { backgroundColor: '#F0F7F4', borderRadius: 10, padding: 14, fontSize: 15, color: '#1B4332', marginBottom: 12 },

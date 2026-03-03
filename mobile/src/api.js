@@ -80,3 +80,13 @@ export async function addHole(roundId, holeData) {
 export async function getRounds() {
   return request('/api/rounds');
 }
+
+export async function deleteRound(roundId) {
+  const res = await fetch(`${BASE_URL}/api/rounds/${roundId}`, {
+    method: 'DELETE',
+    headers: _token ? { Authorization: `Bearer ${_token}` } : {},
+  });
+  if (res.status === 204) return;
+  const data = await res.json();
+  throw new Error(data.detail || `Request failed (${res.status})`);
+}

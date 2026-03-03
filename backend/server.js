@@ -245,7 +245,7 @@ app.post('/api/add-hole', authenticate, async (req, res) => {
     const user = await currentUser(req, res);
     if (!user) return;
 
-    const { round_id, hole_number, strokes, putts, fairway_hit, gir, notes } = req.body;
+    const { round_id, hole_number, par, strokes, putts, fairway_hit, gir, notes } = req.body;
 
     const round = await prisma.round.findUnique({ where: { id: round_id } });
     if (!round) return res.status(404).json({ detail: 'Round not found' });
@@ -255,6 +255,7 @@ app.post('/api/add-hole', authenticate, async (req, res) => {
       data: {
         roundId: round_id,
         holeNumber: hole_number,
+        par: par != null ? parseInt(par) : null,
         strokes,
         putts: putts ?? null,
         fairwayHit: fairway_hit ?? null,
@@ -300,23 +301,53 @@ app.get('/api/rounds', authenticate, async (req, res) => {
   }
 });
 
+app.delete('/api/rounds/:id', authenticate, async (req, res) => {
+  try {
+    const user = await currentUser(req, res);
+    if (!user) return;
+
+    const roundId = parseInt(req.params.id, 10);
+    if (Number.isNaN(roundId)) return res.status(400).json({ detail: 'Invalid round id' });
+
+    const round = await prisma.round.findUnique({ where: { id: roundId } });
+    if (!round) return res.status(404).json({ detail: 'Round not found' });
+    if (round.userId !== user.id) return res.status(403).json({ detail: 'Not allowed to delete this round' });
+
+    await prisma.round.delete({ where: { id: roundId } });
+    return res.status(204).send();
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
 
 // ── Helpers ──
 
 function formatRound(r) {
-  return {
-    round_id: r.id,
-    course_name: r.courseName,
-    started_at: r.startedAt.toISOString(),
-    total_score: r.totalScore,
-    holes: r.holes.map(h => ({
+  const holes = r.holes.map(h => {
+    const par = h.par != null ? h.par : null;
+    const scoreVsPar = par != null ? h.strokes - par : null;
+    return {
       hole_number: h.holeNumber,
+      par,
       strokes: h.strokes,
+      score_vs_par: scoreVsPar,
       putts: h.putts,
       fairway_hit: h.fairwayHit,
       gir: h.gir,
       notes: h.notes,
-    })),
+    };
+  });
+  const totalStrokes = r.totalScore ?? holes.reduce((sum, h) => sum + h.strokes, 0);
+  const totalPar = holes.filter(h => h.par != null).reduce((sum, h) => sum + h.par, 0);
+  const totalVsPar = totalPar > 0 ? totalStrokes - totalPar : null;
+  return {
+    round_id: r.id,
+    course_name: r.courseName,
+    started_at: r.startedAt.toISOString(),
+    total_score: totalStrokes,
+    total_vs_par: totalVsPar,
+    holes,
   };
 }
 
