@@ -106,6 +106,31 @@ function requireSubscription(req, res, next) {
   })();
 }
 
+app.post('/api/admin/grant-subscription', authenticate, async (req, res) => {
+  try {
+    const user = await currentUser(req, res);
+    if (!user) return;
+
+    const adminSecret = req.headers['x-admin-secret'];
+    if (adminSecret !== process.env.SECRET_KEY) {
+      return res.status(403).json({ detail: 'Forbidden' });
+    }
+
+    const years = req.body.years || 100;
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + years);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { subscriptionExpiresAt: expiresAt },
+    });
+
+    return res.json({ message: 'Subscription granted', expires_at: expiresAt.toISOString() });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
 app.get('/api/me', authenticate, async (req, res) => {
   try {
     const user = await currentUser(req, res);
