@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -12,29 +12,56 @@ import { SUBSCRIPTION_PRODUCT_ID } from './constants';
 import * as api from './api';
 import { useSubscription } from './SubscriptionContext';
 
-let useIAP;
-let getAvailablePurchases;
-let iapAvailable = false;
+let iapModule = null;
 try {
-  const iap = require('expo-iap');
-  useIAP = iap.useIAP;
-  getAvailablePurchases = iap.getAvailablePurchases;
-  iapAvailable = true;
+  iapModule = require('expo-iap');
 } catch {
-  iapAvailable = false;
+  iapModule = null;
 }
 
-function useIAPSafe(options) {
-  if (iapAvailable && useIAP) {
-    return useIAP(options);
-  }
-  return {
-    connected: false,
-    subscriptions: [],
-    fetchProducts: async () => {},
-    requestPurchase: async () => {},
-    restorePurchases: async () => {},
-  };
+async function connectAndPurchase() {
+  if (!iapModule) throw new Error('In-app purchases not available in this build.');
+
+  await iapModule.initConnection();
+  await iapModule.fetchProducts({ skus: [SUBSCRIPTION_PRODUCT_ID], type: 'subs' });
+
+  const result = await iapModule.requestPurchase({
+    request: {
+      apple: { sku: SUBSCRIPTION_PRODUCT_ID },
+      google: { skus: [SUBSCRIPTION_PRODUCT_ID] },
+    },
+    type: 'subs',
+  });
+
+  const purchase = Array.isArray(result) ? result[0] : result;
+  if (!purchase) throw new Error('Purchase was cancelled or returned no data.');
+
+  const transactionId = purchase.transactionId ?? purchase.purchaseToken ?? null;
+  if (!transactionId) throw new Error('Could not get transaction ID from purchase.');
+
+  await iapModule.finishTransaction({ purchase, isConsumable: false });
+  return transactionId;
+}
+
+async function connectAndRestore() {
+  if (!iapModule) throw new Error('In-app purchases not available in this build.');
+
+  await iapModule.initConnection();
+  await iapModule.restorePurchases();
+
+  const purchases = await iapModule.getAvailablePurchases({
+    alsoPublishToEventListenerIOS: false,
+    onlyIncludeActiveItemsIOS: true,
+  });
+
+  const sub = Array.isArray(purchases)
+    ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
+    : null;
+
+  const transactionId = sub?.transactionId ?? sub?.purchaseToken ?? null;
+  if (!transactionId) throw new Error('No active subscription found for this account.');
+
+  return transactionId;
 }
 
 export function PaywallScreen({ onSubscribed, title, subtitle }) {
@@ -42,93 +69,31 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
-  const handlePurchaseSuccess = useCallback(
-    async (purchase) => {
-      const transactionId = purchase.transactionId ?? purchase.transactionIdIOS ?? null;
-      if (!transactionId) {
-        Alert.alert('Error', 'Could not get transaction ID. Please try Restore.');
-        return;
-      }
-      try {
-        await api.verifySubscription(transactionId);
-        await refreshSubscription();
-        onSubscribed?.();
-      } catch (err) {
-        Alert.alert('Error', err.message || 'Verification failed');
-      }
-    },
-    [refreshSubscription, onSubscribed]
-  );
-
-  const { connected, subscriptions, fetchProducts, requestPurchase, restorePurchases } = useIAPSafe({
-    onPurchaseSuccess: handlePurchaseSuccess,
-    onPurchaseError: (err) => {
-      setPurchasing(false);
-      const msg = err?.message || 'Purchase failed';
-      if (msg.toLowerCase().includes('cancel')) return;
-      Alert.alert('Purchase failed', msg);
-    },
-    onError: (err) => {
-      setPurchasing(false);
-      setRestoring(false);
-      Alert.alert('Error', err.message || 'Something went wrong');
-    },
-  });
-
-  const subscriptionProduct = subscriptions?.find((s) => s.id === SUBSCRIPTION_PRODUCT_ID);
-  const price = subscriptionProduct?.localizedPrice ?? subscriptionProduct?.price ?? null;
-
   const handleSubscribe = async () => {
-    if (!connected) {
-      Alert.alert(
-        'Not available',
-        'In-app purchases require a development build (not Expo Go). Build the app and try again.'
-      );
-      return;
-    }
     setPurchasing(true);
     try {
-      await fetchProducts({ skus: [SUBSCRIPTION_PRODUCT_ID], type: 'subs' });
-      await requestPurchase({
-        request: { apple: { sku: SUBSCRIPTION_PRODUCT_ID }, google: { skus: [SUBSCRIPTION_PRODUCT_ID] } },
-        type: 'subs',
-      });
-      setPurchasing(false);
+      const transactionId = await connectAndPurchase();
+      await api.verifySubscription(transactionId);
+      await refreshSubscription();
+      onSubscribed?.();
     } catch (err) {
+      const msg = err?.message || 'Purchase failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        Alert.alert('Purchase failed', msg);
+      }
+    } finally {
       setPurchasing(false);
-      Alert.alert('Error', err.message || 'Purchase failed');
     }
   };
 
   const handleRestore = async () => {
-    if (!connected) {
-      Alert.alert(
-        'Not available',
-        'Restore requires a development build (not Expo Go).'
-      );
-      return;
-    }
     setRestoring(true);
     try {
-      await restorePurchases();
-      const purchases = iapAvailable
-        ? await getAvailablePurchases({
-            alsoPublishToEventListenerIOS: false,
-            onlyIncludeActiveItemsIOS: true,
-          })
-        : [];
-      const subscriptionPurchase = Array.isArray(purchases)
-        ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
-        : null;
-      const tid = subscriptionPurchase?.transactionId ?? subscriptionPurchase?.transactionIdIOS ?? subscriptionPurchase?.purchaseToken;
-      if (tid) {
-        await api.verifySubscription(tid);
-        await refreshSubscription();
-        onSubscribed?.();
-        Alert.alert('Restored', 'Your subscription has been restored.');
-      } else {
-        Alert.alert('No subscription found', 'We couldn\'t find an active subscription for this account.');
-      }
+      const transactionId = await connectAndRestore();
+      await api.verifySubscription(transactionId);
+      await refreshSubscription();
+      onSubscribed?.();
+      Alert.alert('Restored', 'Your subscription has been restored.');
     } catch (err) {
       Alert.alert('Restore failed', err.message || 'Could not restore purchases.');
     } finally {
@@ -161,9 +126,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           {purchasing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={s.primaryBtnText}>
-              {price ? `Subscribe — ${price}/month` : 'Subscribe monthly'}
-            </Text>
+            <Text style={s.primaryBtnText}>Subscribe monthly</Text>
           )}
         </TouchableOpacity>
 
@@ -172,14 +135,8 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           onPress={handleRestore}
           disabled={purchasing || restoring}
         >
-          <Text style={s.restoreBtnText}>{restoring ? 'Restoring…' : 'Restore purchases'}</Text>
+          <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore purchases'}</Text>
         </TouchableOpacity>
-
-        {!connected && (
-          <Text style={s.devNote}>
-            In-app purchases require a development build (not Expo Go). Run the app with a dev build to subscribe.
-          </Text>
-        )}
       </View>
     </View>
   );
@@ -265,12 +222,5 @@ const s = StyleSheet.create({
     color: '#2D6A4F',
     fontSize: 15,
     fontWeight: '600',
-  },
-  devNote: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 18,
   },
 });
