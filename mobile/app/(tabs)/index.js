@@ -8,7 +8,7 @@ import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
 
 export default function CaddieScreen() {
-  const { subscriptionActive, loading } = useSubscription();
+  const { subscriptionActive, loading: subLoading } = useSubscription();
   const [mode, setMode] = useState('club');
 
   // Club recommendation state
@@ -59,7 +59,7 @@ export default function CaddieScreen() {
 
   const hasData = result && result.data;
 
-  if (loading) {
+  if (subLoading) {
     return (
       <View style={s.center}>
         <ActivityIndicator size="large" color="#2D6A4F" />
