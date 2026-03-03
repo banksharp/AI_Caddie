@@ -4,8 +4,11 @@ import {
   ScrollView, StyleSheet, Alert, ActivityIndicator,
 } from 'react-native';
 import * as api from '../../src/api';
+import { useSubscription } from '../../src/SubscriptionContext';
+import { PaywallScreen } from '../../src/PaywallScreen';
 
 export default function CaddieScreen() {
+  const { subscriptionActive, loading } = useSubscription();
   const [mode, setMode] = useState('club');
 
   // Club recommendation state
@@ -55,6 +58,17 @@ export default function CaddieScreen() {
   }
 
   const hasData = result && result.data;
+
+  if (loading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color="#2D6A4F" />
+      </View>
+    );
+  }
+  if (!subscriptionActive) {
+    return <PaywallScreen title="Unlock Club Rec & Strategy" subtitle="Subscribe to use AI club recommendations and course strategy." />;
+  }
 
   return (
     <ScrollView style={s.container} contentContainerStyle={s.content}>

@@ -42,6 +42,20 @@ export async function getProfile() {
   return request('/api/me');
 }
 
+export async function verifySubscription(transactionId) {
+  return request('/api/subscription/verify', {
+    method: 'POST',
+    body: JSON.stringify({ transactionId }),
+  });
+}
+
+export async function changePassword(currentPassword, newPassword) {
+  return request('/api/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}
+
 export async function setupClubs(clubs) {
   return request('/api/setup-clubs', {
     method: 'POST',
