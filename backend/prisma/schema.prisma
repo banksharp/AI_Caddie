@@ -8,11 +8,12 @@ datasource db {
 }
 
 model User {
-  id           Int     @id @default(autoincrement())
-  email        String  @unique
-  passwordHash String  @map("password_hash")
-  clubs        Json?   @default("{}")
-  rounds       Round[]
+  id                   Int       @id @default(autoincrement())
+  email                String    @unique
+  passwordHash         String    @map("password_hash")
+  clubs                Json?     @default("{}")
+  subscriptionExpiresAt DateTime? @map("subscription_expires_at") @db.Timestamptz
+  rounds               Round[]
 
   @@map("users")
 }

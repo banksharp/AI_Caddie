@@ -5,6 +5,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as api from '../../src/api';
+import { useSubscription } from '../../src/SubscriptionContext';
+import { PaywallScreen } from '../../src/PaywallScreen';
 
 const CLUB_LIST = [
   'Driver', '3-Wood', '5-Wood', '3-Hybrid', '4-Hybrid',
@@ -13,6 +15,7 @@ const CLUB_LIST = [
 ];
 
 export default function ClubsScreen() {
+  const { subscriptionActive, loading: subLoading } = useSubscription();
   const [savedClubs, setSavedClubs] = useState({});
   const [editClubs, setEditClubs] = useState({});
   const [editing, setEditing] = useState(false);
@@ -72,6 +75,22 @@ export default function ClubsScreen() {
 
   const hasSavedClubs = Object.keys(savedClubs).length > 0;
   const sortedClubs = CLUB_LIST.filter((c) => savedClubs[c] !== undefined);
+
+  if (subLoading) {
+    return (
+      <View style={s.center}>
+        <ActivityIndicator size="large" color="#2D6A4F" />
+      </View>
+    );
+  }
+  if (!subscriptionActive) {
+    return (
+      <PaywallScreen
+        title="Unlock My Clubs"
+        subtitle="Subscribe to save and edit your club distances for better AI recommendations."
+      />
+    );
+  }
 
   if (loading) {
     return (

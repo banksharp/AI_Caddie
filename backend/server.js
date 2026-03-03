@@ -88,17 +88,143 @@ app.post('/api/login', async (req, res) => {
 
 // ── Protected routes ──
 
+function subscriptionActive(user) {
+  if (!user.subscriptionExpiresAt) return false;
+  return new Date() < new Date(user.subscriptionExpiresAt);
+}
+
+function requireSubscription(req, res, next) {
+  (async () => {
+    const user = await currentUser(req, res);
+    if (!user) return;
+    if (!subscriptionActive(user)) {
+      res.status(403).json({ detail: 'Active subscription required', code: 'subscription_required' });
+      return;
+    }
+    req.user = user;
+    next();
+  })();
+}
+
 app.get('/api/me', authenticate, async (req, res) => {
   try {
     const user = await currentUser(req, res);
     if (!user) return;
-    return res.json({ email: user.email, clubs: user.clubs || {} });
+    const active = subscriptionActive(user);
+    return res.json({
+      email: user.email,
+      clubs: user.clubs || {},
+      subscription_active: active,
+      subscription_expires_at: user.subscriptionExpiresAt ? user.subscriptionExpiresAt.toISOString() : null,
+    });
   } catch (err) {
     return res.status(500).json({ detail: err.message });
   }
 });
 
-app.post('/api/setup-clubs', authenticate, async (req, res) => {
+app.post('/api/change-password', authenticate, async (req, res) => {
+  try {
+    const user = await currentUser(req, res);
+    if (!user) return;
+
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ detail: 'current_password and new_password required' });
+    }
+    if (new_password.length < 6) {
+      return res.status(400).json({ detail: 'New password must be at least 6 characters' });
+    }
+
+    if (!(await bcrypt.compare(current_password, user.passwordHash))) {
+      return res.status(401).json({ detail: 'Current password is incorrect' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: await bcrypt.hash(new_password, 10) },
+    });
+    return res.json({ message: 'Password updated' });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+// Subscription verification (no subscription required to call)
+app.post('/api/subscription/verify', authenticate, async (req, res) => {
+  try {
+    const user = await currentUser(req, res);
+    if (!user) return;
+
+    const { transactionId } = req.body;
+    if (!transactionId || typeof transactionId !== 'string') {
+      return res.status(400).json({ detail: 'transactionId required' });
+    }
+
+    const keyId = process.env.APPLE_KEY_ID;
+    const issuerId = process.env.APPLE_ISSUER_ID;
+    const privateKey = process.env.APPLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+    const bundleId = process.env.APPLE_BUNDLE_ID;
+    const sandbox = process.env.APPLE_SANDBOX === 'true';
+
+    if (!keyId || !issuerId || !privateKey || !bundleId) {
+      return res.status(503).json({ detail: 'Subscription verification not configured' });
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const token = jwt.sign(
+      { iss: issuerId, iat: now, exp: now + 300, aud: 'appstoreconnect-api' },
+      privateKey,
+      { algorithm: 'ES256', keyid: keyId }
+    );
+
+    const baseUrl = sandbox
+      ? 'https://api.storekit-sandbox.itunes.apple.com'
+      : 'https://api.storekit.itunes.apple.com';
+    const r = await fetch(`${baseUrl}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!r.ok) {
+      const err = await r.text();
+      return res.status(400).json({ detail: 'Invalid or expired transaction', raw: err });
+    }
+
+    const data = await r.json();
+    const signedTransactionInfo = data.signedTransactionInfo;
+    if (!signedTransactionInfo) {
+      return res.status(400).json({ detail: 'No transaction info in response' });
+    }
+
+    const parts = signedTransactionInfo.split('.');
+    if (parts.length !== 3) {
+      return res.status(400).json({ detail: 'Invalid signed transaction' });
+    }
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString());
+    const expirationMs = payload.expiresDate;
+    if (!expirationMs) {
+      return res.status(400).json({ detail: 'Transaction has no expiration' });
+    }
+
+    const expiresAt = new Date(expirationMs);
+    if (expiresAt <= new Date()) {
+      return res.status(400).json({ detail: 'Subscription already expired' });
+    }
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { subscriptionExpiresAt: expiresAt },
+    });
+
+    return res.json({
+      subscription_active: true,
+      subscription_expires_at: expiresAt.toISOString(),
+    });
+  } catch (err) {
+    return res.status(500).json({ detail: err.message });
+  }
+});
+
+app.post('/api/setup-clubs', authenticate, requireSubscription, async (req, res) => {
   try {
     const user = await currentUser(req, res);
     if (!user) return;
@@ -125,7 +251,7 @@ function maybeParseModelJson(text) {
   }
 }
 
-app.post('/api/club-recommendation', authenticate, async (req, res) => {
+app.post('/api/club-recommendation', authenticate, requireSubscription, async (req, res) => {
   try {
     const user = await currentUser(req, res);
     if (!user) return;
@@ -167,7 +293,7 @@ app.post('/api/club-recommendation', authenticate, async (req, res) => {
   }
 });
 
-app.post('/api/course-strategy', authenticate, async (req, res) => {
+app.post('/api/course-strategy', authenticate, requireSubscription, async (req, res) => {
   try {
     const user = await currentUser(req, res);
     if (!user) return;
