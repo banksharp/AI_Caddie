@@ -88,11 +88,7 @@ app.post('/api/login', async (req, res) => {
 
 // ── Protected routes ──
 
-// TODO: remove DEV_BYPASS after taking screenshots
-const DEV_BYPASS_SUBSCRIPTION = true;
-
 function subscriptionActive(user) {
-  if (DEV_BYPASS_SUBSCRIPTION) return true;
   if (!user.subscriptionExpiresAt) return false;
   return new Date() < new Date(user.subscriptionExpiresAt);
 }

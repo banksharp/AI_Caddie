@@ -6,9 +6,7 @@ const SubscriptionContext = createContext(null);
 
 export function SubscriptionProvider({ children }) {
   const { token } = useAuth();
-  // TODO: remove this override after taking screenshots
-  const DEV_BYPASS_PAYWALL = true;
-  const [subscriptionActive, setSubscriptionActive] = useState(true);
+  const [subscriptionActive, setSubscriptionActive] = useState(false);
   const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -22,7 +20,7 @@ export function SubscriptionProvider({ children }) {
     setLoading(true);
     try {
       const data = await api.getProfile();
-      setSubscriptionActive(DEV_BYPASS_PAYWALL || (data.subscription_active ?? false));
+      setSubscriptionActive(data.subscription_active ?? false);
       setSubscriptionExpiresAt(data.subscription_expires_at ?? null);
     } catch {
       setSubscriptionActive(false);
