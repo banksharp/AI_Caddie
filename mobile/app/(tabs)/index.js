@@ -207,6 +207,7 @@ export default function CaddieScreen() {
 }
 
 const s = StyleSheet.create({
+  center: { flex: 1, backgroundColor: '#F0F7F4', justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: '#F0F7F4' },
   content: { padding: 16, paddingBottom: 40 },
   toggle: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10, padding: 4, marginBottom: 16 },
