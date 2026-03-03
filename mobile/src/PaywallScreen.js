@@ -8,8 +8,99 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { SUBSCRIPTION_PRODUCT_ID } from './constants';
+import * as api from './api';
+import { useSubscription } from './SubscriptionContext';
+
+let iap = null;
+try {
+  iap = require('expo-iap');
+} catch {
+  iap = null;
+}
+
+async function connectAndPurchase() {
+  if (!iap) throw new Error('In-app purchases not available in this build.');
+
+  await iap.initConnection();
+  await iap.fetchProducts({ skus: [SUBSCRIPTION_PRODUCT_ID], type: 'subs' });
+
+  const result = await iap.requestPurchase({
+    request: {
+      apple: { sku: SUBSCRIPTION_PRODUCT_ID },
+      google: { skus: [SUBSCRIPTION_PRODUCT_ID] },
+    },
+    type: 'subs',
+  });
+
+  const purchase = Array.isArray(result) ? result[0] : result;
+  if (!purchase) throw new Error('Purchase was cancelled.');
+
+  const transactionId = purchase.transactionId ?? purchase.purchaseToken ?? null;
+  if (!transactionId) throw new Error('Could not get transaction ID.');
+
+  try { await iap.finishTransaction({ purchase, isConsumable: false }); } catch {}
+  return transactionId;
+}
+
+async function connectAndRestore() {
+  if (!iap) throw new Error('In-app purchases not available in this build.');
+
+  await iap.initConnection();
+  await iap.restorePurchases();
+
+  const purchases = await iap.getAvailablePurchases({
+    alsoPublishToEventListenerIOS: false,
+    onlyIncludeActiveItemsIOS: true,
+  });
+
+  const sub = Array.isArray(purchases)
+    ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
+    : null;
+
+  const transactionId = sub?.transactionId ?? sub?.purchaseToken ?? null;
+  if (!transactionId) throw new Error('No active subscription found for this account.');
+
+  return transactionId;
+}
 
 export function PaywallScreen({ onSubscribed, title, subtitle }) {
+  const { refreshSubscription } = useSubscription();
+  const [purchasing, setPurchasing] = useState(false);
+  const [restoring, setRestoring] = useState(false);
+
+  const handleSubscribe = async () => {
+    setPurchasing(true);
+    try {
+      const transactionId = await connectAndPurchase();
+      await api.verifySubscription(transactionId);
+      await refreshSubscription();
+      onSubscribed?.();
+    } catch (err) {
+      const msg = err?.message || 'Purchase failed';
+      if (!msg.toLowerCase().includes('cancel')) {
+        Alert.alert('Purchase failed', msg);
+      }
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleRestore = async () => {
+    setRestoring(true);
+    try {
+      const transactionId = await connectAndRestore();
+      await api.verifySubscription(transactionId);
+      await refreshSubscription();
+      onSubscribed?.();
+      Alert.alert('Restored', 'Your subscription has been restored.');
+    } catch (err) {
+      Alert.alert('Restore failed', err.message || 'Could not restore purchases.');
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   return (
     <View style={s.container}>
       <View style={s.card}>
@@ -27,10 +118,25 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           <FeatureRow text="Save and edit your club distances" />
         </View>
 
-        <View style={s.comingSoon}>
-          <Ionicons name="time-outline" size={20} color="#2D6A4F" />
-          <Text style={s.comingSoonText}>Subscription coming soon</Text>
-        </View>
+        <TouchableOpacity
+          style={[s.primaryBtn, (purchasing || restoring) && s.btnDisabled]}
+          onPress={handleSubscribe}
+          disabled={purchasing || restoring}
+        >
+          {purchasing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={s.primaryBtnText}>Subscribe monthly</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={s.restoreBtn}
+          onPress={handleRestore}
+          disabled={purchasing || restoring}
+        >
+          <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore purchases'}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -93,18 +199,28 @@ const s = StyleSheet.create({
     color: '#374151',
     flex: 1,
   },
-  comingSoon: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#F0F7F4',
+  primaryBtn: {
+    backgroundColor: '#2D6A4F',
     borderRadius: 12,
     padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  comingSoonText: {
-    color: '#2D6A4F',
-    fontSize: 16,
+  btnDisabled: {
+    opacity: 0.7,
+  },
+  primaryBtnText: {
+    color: '#fff',
+    fontSize: 17,
     fontWeight: '700',
+  },
+  restoreBtn: {
+    padding: 12,
+    alignItems: 'center',
+  },
+  restoreBtnText: {
+    color: '#2D6A4F',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
