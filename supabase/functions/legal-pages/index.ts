@@ -31,7 +31,7 @@ const PRIVACY = `<!DOCTYPE html><html><head><title>Privacy Policy – AI Caddie<
 <h2>Security</h2>
 <p>Passwords are hashed using bcrypt. All communication uses HTTPS encryption.</p>
 <h2>Contact</h2>
-<p>Questions? Email us at <a href="mailto:support@caiddie.com">support@caiddie.com</a>.</p>
+<p>Questions? Email us at <a href="mailto:caiddiesupport@gmail.com">caiddiesupport@gmail.com</a>.</p>
 </body></html>`;
 
 const TERMS = `<!DOCTYPE html><html><head><title>Terms of Use – AI Caddie</title>${PAGE_STYLE}</head><body>
@@ -55,7 +55,7 @@ const TERMS = `<!DOCTYPE html><html><head><title>Terms of Use – AI Caddie</tit
 <h2>Changes</h2>
 <p>We may update these terms at any time. Continued use of the app constitutes acceptance of updated terms.</p>
 <h2>Contact</h2>
-<p>Questions? Email us at <a href="mailto:support@caiddie.com">support@caiddie.com</a>.</p>
+<p>Questions? Email us at <a href="mailto:caiddiesupport@gmail.com">caiddiesupport@gmail.com</a>.</p>
 </body></html>`;
 
 const SUPPORT = `<!DOCTYPE html><html><head><title>Support – AI Caddie</title>${PAGE_STYLE}</head><body>
@@ -71,7 +71,7 @@ const SUPPORT = `<!DOCTYPE html><html><head><title>Support – AI Caddie</title>
 <h3>How do I delete my account?</h3>
 <p>Go to the Profile tab and tap "Delete Account". This permanently removes all your data.</p>
 <h2>Contact Us</h2>
-<p>For any other questions or issues, email us at <a href="mailto:support@caiddie.com">support@caiddie.com</a>.</p>
+<p>For any other questions or issues, email us at <a href="mailto:caiddiesupport@gmail.com">caiddiesupport@gmail.com</a>.</p>
 </body></html>`;
 
 const PAGES: Record<string, string> = {
