@@ -56,6 +56,21 @@ export async function changePassword(currentPassword, newPassword) {
   });
 }
 
+export async function deleteAccount(password) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (_token) headers['Authorization'] = `Bearer ${_token}`;
+
+  const res = await fetch(`${BASE_URL}/api/account`, {
+    method: 'DELETE',
+    headers,
+    body: JSON.stringify({ password }),
+  });
+
+  if (res.status === 204) return;
+  const data = await res.json();
+  throw new Error(data.detail || `Request failed (${res.status})`);
+}
+
 export async function setupClubs(clubs) {
   return request('/api/setup-clubs', {
     method: 'POST',

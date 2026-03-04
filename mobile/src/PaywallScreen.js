@@ -23,7 +23,19 @@ async function connectAndPurchase() {
   if (!iap) throw new Error('In-app purchases not available in this build.');
 
   await iap.initConnection();
-  await iap.fetchProducts({ skus: [SUBSCRIPTION_PRODUCT_ID], type: 'subs' });
+
+  const products = await iap.fetchProducts({
+    skus: [SUBSCRIPTION_PRODUCT_ID],
+    type: 'subs',
+  });
+
+  if (!products || products.length === 0) {
+    throw new Error(
+      `Subscription "${SUBSCRIPTION_PRODUCT_ID}" not found in the store. ` +
+      'Please verify the product ID matches App Store Connect and that the ' +
+      'subscription has a price, localization, and status "Ready to Submit".',
+    );
+  }
 
   const result = await iap.requestPurchase({
     request: {
