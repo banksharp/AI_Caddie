@@ -152,15 +152,15 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
         </TouchableOpacity>
 
         <View style={s.legalRow}>
-          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/privacy')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://banksharp.github.io/AI_Caddie/privacy.html')}>
             <Text style={s.legalLink}>Privacy Policy</Text>
           </TouchableOpacity>
           <Text style={s.legalSeparator}>•</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/terms')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://banksharp.github.io/AI_Caddie/terms.html')}>
             <Text style={s.legalLink}>Terms of Use</Text>
           </TouchableOpacity>
           <Text style={s.legalSeparator}>•</Text>
-          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/support')}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://banksharp.github.io/AI_Caddie/support.html')}>
             <Text style={s.legalLink}>Support</Text>
           </TouchableOpacity>
         </View>
