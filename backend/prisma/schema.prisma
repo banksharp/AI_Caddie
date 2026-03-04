@@ -9,6 +9,8 @@ datasource db {
 
 model User {
   id                   Int       @id @default(autoincrement())
+  firstName            String    @map("first_name")
+  lastName             String    @map("last_name")
   email                String    @unique
   passwordHash         String    @map("password_hash")
   clubs                Json?     @default("{}")

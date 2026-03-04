@@ -10,6 +10,8 @@ import * as api from '../src/api';
 const logo = require('../assets/icon.png');
 
 export default function RegisterScreen() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -18,13 +20,13 @@ export default function RegisterScreen() {
   const router = useRouter();
 
   async function handleRegister() {
-    if (!email || !password || !confirm) return Alert.alert('Error', 'Please fill in all fields');
+    if (!firstName || !lastName || !email || !password || !confirm) return Alert.alert('Error', 'Please fill in all fields');
     if (password !== confirm) return Alert.alert('Error', 'Passwords do not match');
     if (password.length < 6) return Alert.alert('Error', 'Password must be at least 6 characters');
 
     setBusy(true);
     try {
-      const data = await api.register(email, password);
+      const data = await api.register(firstName, lastName, email, password);
       await signIn(data.access_token);
       router.replace('/(tabs)');
     } catch (err) {
@@ -41,6 +43,24 @@ export default function RegisterScreen() {
         <Text style={s.logo}>Create Account</Text>
         <Text style={s.subtitle}>Join cAIddie and improve your game</Text>
 
+        <View style={s.nameRow}>
+          <TextInput
+            style={[s.input, s.nameInput]}
+            placeholder="First Name"
+            placeholderTextColor="#8BA89A"
+            autoCapitalize="words"
+            value={firstName}
+            onChangeText={setFirstName}
+          />
+          <TextInput
+            style={[s.input, s.nameInput]}
+            placeholder="Last Name"
+            placeholderTextColor="#8BA89A"
+            autoCapitalize="words"
+            value={lastName}
+            onChangeText={setLastName}
+          />
+        </View>
         <TextInput
           style={s.input}
           placeholder="Email"
@@ -85,6 +105,8 @@ const s = StyleSheet.create({
   logoImage: { width: 120, height: 120, alignSelf: 'center', marginBottom: 12, borderRadius: 20 },
   logo: { fontSize: 28, fontWeight: '800', color: '#2D6A4F', textAlign: 'center' },
   subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 28 },
+  nameRow: { flexDirection: 'row', gap: 10 },
+  nameInput: { flex: 1 },
   input: { backgroundColor: '#F0F7F4', borderRadius: 10, padding: 14, fontSize: 16, color: '#1B4332', marginBottom: 14 },
   btn: { backgroundColor: '#2D6A4F', borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 16 },
   btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },

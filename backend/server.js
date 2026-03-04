@@ -139,14 +139,18 @@ async function currentUser(req, res) {
 
 app.post('/api/register', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { first_name, last_name, email, password } = req.body;
+
+    if (!first_name || !last_name) {
+      return res.status(400).json({ detail: 'First name and last name are required' });
+    }
 
     if (await prisma.user.findUnique({ where: { email } })) {
       return res.status(400).json({ detail: 'Email already registered' });
     }
 
     const user = await prisma.user.create({
-      data: { email, passwordHash: await bcrypt.hash(password, 10), clubs: {} },
+      data: { firstName: first_name, lastName: last_name, email, passwordHash: await bcrypt.hash(password, 10), clubs: {} },
     });
 
     return res.json({ access_token: createToken(user.email), token_type: 'bearer' });
@@ -222,6 +226,8 @@ app.get('/api/me', authenticate, async (req, res) => {
     if (!user) return;
     const active = subscriptionActive(user);
     return res.json({
+      first_name: user.firstName,
+      last_name: user.lastName,
       email: user.email,
       clubs: user.clubs || {},
       subscription_active: active,

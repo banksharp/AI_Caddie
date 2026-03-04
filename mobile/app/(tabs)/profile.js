@@ -119,6 +119,11 @@ export default function ProfileScreen() {
       <View style={s.card}>
         <Text style={s.cardTitle}>Account</Text>
         <View style={s.row}>
+          <Ionicons name="person-outline" size={20} color="#2D6A4F" />
+          <Text style={s.label}>Name</Text>
+        </View>
+        <Text style={s.value}>{[profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || '-'}</Text>
+        <View style={[s.row, { marginTop: 12 }]}>
           <Ionicons name="mail-outline" size={20} color="#2D6A4F" />
           <Text style={s.label}>Email</Text>
         </View>
