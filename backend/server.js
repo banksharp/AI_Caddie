@@ -623,15 +623,6 @@ setInterval(() => {
 
 // ── Start ──
 
-app.listen(PORT, '0.0.0.0', async () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`AI Caddie API running on port ${PORT}`);
-
-  // One-time backfill: set names for existing accounts that have empty names
-  try {
-    const updated = await prisma.user.updateMany({
-      where: { OR: [{ firstName: '' }, { lastName: '' }] },
-      data: { firstName: 'Banks', lastName: 'Harper' },
-    });
-    if (updated.count > 0) console.log(`Backfilled names for ${updated.count} existing user(s)`);
-  } catch {}
 });
