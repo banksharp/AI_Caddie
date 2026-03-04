@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
-  TextInput, Modal, ActivityIndicator, ScrollView,
+  TextInput, Modal, ActivityIndicator, ScrollView, Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -101,6 +101,15 @@ export default function ProfileScreen() {
     }
   }
 
+  function openManageSubscriptions() {
+    Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {
+      Alert.alert(
+        'Manage Subscription',
+        'Open Settings → Apple ID → Subscriptions to manage or cancel your AI Caddie subscription.',
+      );
+    });
+  }
+
   if (loading) {
     return (
       <View style={s.center}>
@@ -140,6 +149,10 @@ export default function ProfileScreen() {
             </View>
             <Text style={s.subText}>Renews or expires: {expiresAt}</Text>
             <Text style={s.hint}>Manage or cancel in your device Settings → Subscriptions.</Text>
+            <TouchableOpacity style={s.manageBtn} onPress={openManageSubscriptions}>
+              <Ionicons name="settings-outline" size={18} color="#2D6A4F" />
+              <Text style={s.manageBtnText}>Open subscription settings</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <>
@@ -276,6 +289,8 @@ const s = StyleSheet.create({
   badgeTextInactive: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
   subText: { fontSize: 14, color: '#374151', marginBottom: 8 },
   hint: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
+  manageBtn: { marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 },
+  manageBtnText: { fontSize: 14, fontWeight: '600', color: '#2D6A4F' },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2D6A4F', borderRadius: 10, padding: 14 },
   btnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
   subscribeBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#2D6A4F', borderRadius: 10, padding: 14, marginTop: 12 },
