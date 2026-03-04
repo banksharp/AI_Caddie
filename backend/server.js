@@ -605,6 +605,16 @@ function formatRound(r) {
 }
 
 
+// ── Health check & keep-alive ──
+
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+setInterval(() => {
+  fetch(`${RENDER_URL}/health`).catch(() => {});
+}, 10 * 60 * 1000);
+
+
 // ── Start ──
 
 app.listen(PORT, '0.0.0.0', () => {
