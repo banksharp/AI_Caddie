@@ -9,8 +9,8 @@ datasource db {
 
 model User {
   id                   Int       @id @default(autoincrement())
-  firstName            String    @map("first_name")
-  lastName             String    @map("last_name")
+  firstName            String    @map("first_name") @default("")
+  lastName             String    @map("last_name") @default("")
   email                String    @unique
   passwordHash         String    @map("password_hash")
   clubs                Json?     @default("{}")
