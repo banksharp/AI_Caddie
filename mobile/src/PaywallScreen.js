@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SUBSCRIPTION_PRODUCT_ID } from './constants';
@@ -149,6 +150,20 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
         >
           <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore purchases'}</Text>
         </TouchableOpacity>
+
+        <View style={s.legalRow}>
+          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/privacy')}>
+            <Text style={s.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
+          <Text style={s.legalSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/terms')}>
+            <Text style={s.legalLink}>Terms of Use</Text>
+          </TouchableOpacity>
+          <Text style={s.legalSeparator}>•</Text>
+          <TouchableOpacity onPress={() => Linking.openURL('https://ai-caddie.onrender.com/support')}>
+            <Text style={s.legalLink}>Support</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -234,5 +249,22 @@ const s = StyleSheet.create({
     color: '#2D6A4F',
     fontSize: 15,
     fontWeight: '600',
+  },
+  legalRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 4,
+  },
+  legalLink: {
+    fontSize: 12,
+    color: '#6B7280',
+    textDecorationLine: 'underline',
+    marginHorizontal: 4,
+  },
+  legalSeparator: {
+    fontSize: 12,
+    color: '#9CA3AF',
   },
 });
