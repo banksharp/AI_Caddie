@@ -24,10 +24,10 @@ async function request(path, options = {}) {
   return data;
 }
 
-export async function register(email, password) {
+export async function register(firstName, lastName, email, password) {
   return request('/api/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ first_name: firstName, last_name: lastName, email, password }),
   });
 }
 
