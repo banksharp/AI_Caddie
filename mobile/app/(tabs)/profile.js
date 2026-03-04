@@ -4,21 +4,27 @@ import {
   TextInput, Modal, ActivityIndicator, ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import * as api from '../../src/api';
+import { useAuth } from '../../src/AuthContext';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
 
 export default function ProfileScreen() {
+  const { signOut } = useAuth();
+  const router = useRouter();
   const { refreshSubscription } = useSubscription();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
+  const [deleteModal, setDeleteModal] = useState(false);
   const [paywallModal, setPaywallModal] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -63,6 +69,35 @@ export default function ProfileScreen() {
       Alert.alert('Error', err.message);
     } finally {
       setChanging(false);
+    }
+  }
+
+  function confirmDeleteAccount() {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account, all rounds, and club data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue', style: 'destructive', onPress: () => setDeleteModal(true) },
+      ],
+    );
+  }
+
+  async function handleDeleteAccount() {
+    if (!deletePassword) {
+      Alert.alert('Error', 'Please enter your password to confirm');
+      return;
+    }
+    setDeleting(true);
+    try {
+      await api.deleteAccount(deletePassword);
+      setDeleteModal(false);
+      await signOut();
+      router.replace('/login');
+    } catch (err) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -128,6 +163,40 @@ export default function ProfileScreen() {
           <Text style={s.btnText}>Change password</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={s.card}>
+        <Text style={s.cardTitle}>Account</Text>
+        <Text style={s.hint}>Permanently delete your account and all associated data.</Text>
+        <TouchableOpacity style={s.deleteBtn} onPress={confirmDeleteAccount}>
+          <Ionicons name="trash-outline" size={20} color="#fff" />
+          <Text style={s.btnText}>Delete Account</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Modal visible={deleteModal} transparent animationType="slide">
+        <View style={s.modalOverlay}>
+          <View style={s.modalCard}>
+            <Text style={s.modalTitle}>Confirm Account Deletion</Text>
+            <Text style={s.deleteWarning}>Enter your password to permanently delete your account. This cannot be undone.</Text>
+            <TextInput
+              style={s.input}
+              placeholder="Your password"
+              placeholderTextColor="#8BA89A"
+              secureTextEntry
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+            />
+            <View style={s.modalRow}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => { setDeleteModal(false); setDeletePassword(''); }}>
+                <Text style={s.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={s.deleteConfirmBtn} onPress={handleDeleteAccount} disabled={deleting}>
+                <Text style={s.btnText}>{deleting ? 'Deleting...' : 'Delete'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={paywallModal} animationType="slide">
         <View style={s.paywallModalWrap}>
@@ -218,4 +287,7 @@ const s = StyleSheet.create({
   cancelBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#F3F4F6', alignItems: 'center' },
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
   submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#2D6A4F', alignItems: 'center' },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#DC2626', borderRadius: 10, padding: 14, marginTop: 12 },
+  deleteWarning: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 16 },
+  deleteConfirmBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#DC2626', alignItems: 'center' },
 });
