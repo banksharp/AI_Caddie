@@ -1,39 +1,72 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import * as SecureStore from 'expo-secure-store';
-import { setToken, clearToken } from './api';
+import { Linking } from 'react-native';
+import { supabase } from './supabase';
 
 const AuthContext = createContext(null);
 
-const TOKEN_KEY = 'ai_caddie_token';
+function extractAuthCode(url) {
+  if (!url) return null;
+  try {
+    const codeMatch = url.match(/[?&#]code=([^&#]+)/);
+    return codeMatch ? codeMatch[1] : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
-  const [token, setTokenState] = useState(null);
+  const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    SecureStore.getItemAsync(TOKEN_KEY).then((saved) => {
-      if (saved) {
-        setTokenState(saved);
-        setToken(saved);
-      }
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      setSession(s);
       setLoading(false);
     });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  async function signIn(accessToken) {
-    await SecureStore.setItemAsync(TOKEN_KEY, accessToken);
-    setTokenState(accessToken);
-    setToken(accessToken);
+  useEffect(() => {
+    async function handleDeepLink(url) {
+      const code = extractAuthCode(url);
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+      }
+    }
+
+    Linking.getInitialURL().then(handleDeepLink);
+    const sub = Linking.addEventListener('url', (event) => handleDeepLink(event.url));
+    return () => sub.remove();
+  }, []);
+
+  async function signUp(firstName, lastName, email, password) {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { first_name: firstName, last_name: lastName } },
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function signIn(email, password) {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+    return data;
   }
 
   async function signOut() {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
-    setTokenState(null);
-    clearToken();
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   }
 
   return (
-    <AuthContext.Provider value={{ token, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signUp, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

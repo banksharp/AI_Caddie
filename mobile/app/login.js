@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
-import * as api from '../src/api';
 
 const logo = require('../assets/icon.png');
 
@@ -20,8 +19,7 @@ export default function LoginScreen() {
     if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
     setBusy(true);
     try {
-      const data = await api.login(email, password);
-      await signIn(data.access_token);
+      await signIn(email, password);
       router.replace('/(tabs)');
     } catch (err) {
       Alert.alert('Login Failed', err.message);

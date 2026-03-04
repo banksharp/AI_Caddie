@@ -17,13 +17,10 @@ export default function ProfileScreen() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
-  const [deleteModal, setDeleteModal] = useState(false);
   const [paywallModal, setPaywallModal] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
-  const [deletePassword, setDeletePassword] = useState('');
   const [deleting, setDeleting] = useState(false);
 
   useFocusEffect(
@@ -45,7 +42,7 @@ export default function ProfileScreen() {
   }
 
   async function handleChangePassword() {
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!newPassword || !confirmPassword) {
       Alert.alert('Error', 'Fill in all fields');
       return;
     }
@@ -59,10 +56,9 @@ export default function ProfileScreen() {
     }
     setChanging(true);
     try {
-      await api.changePassword(currentPassword, newPassword);
+      await api.changePassword(null, newPassword);
       Alert.alert('Success', 'Password updated');
       setPasswordModal(false);
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
@@ -78,27 +74,24 @@ export default function ProfileScreen() {
       'This will permanently delete your account, all rounds, and club data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Continue', style: 'destructive', onPress: () => setDeleteModal(true) },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await api.deleteAccount();
+              await signOut();
+              router.replace('/login');
+            } catch (err) {
+              Alert.alert('Error', err.message);
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
       ],
     );
-  }
-
-  async function handleDeleteAccount() {
-    if (!deletePassword) {
-      Alert.alert('Error', 'Please enter your password to confirm');
-      return;
-    }
-    setDeleting(true);
-    try {
-      await api.deleteAccount(deletePassword);
-      setDeleteModal(false);
-      await signOut();
-      router.replace('/login');
-    } catch (err) {
-      Alert.alert('Error', err.message);
-    } finally {
-      setDeleting(false);
-    }
   }
 
   function openManageSubscriptions() {
@@ -185,36 +178,11 @@ export default function ProfileScreen() {
       <View style={s.card}>
         <Text style={s.cardTitle}>Account</Text>
         <Text style={s.hint}>Permanently delete your account and all associated data.</Text>
-        <TouchableOpacity style={s.deleteBtn} onPress={confirmDeleteAccount}>
+        <TouchableOpacity style={s.deleteBtn} onPress={confirmDeleteAccount} disabled={deleting}>
           <Ionicons name="trash-outline" size={20} color="#fff" />
-          <Text style={s.btnText}>Delete Account</Text>
+          <Text style={s.btnText}>{deleting ? 'Deleting...' : 'Delete Account'}</Text>
         </TouchableOpacity>
       </View>
-
-      <Modal visible={deleteModal} transparent animationType="slide">
-        <View style={s.modalOverlay}>
-          <View style={s.modalCard}>
-            <Text style={s.modalTitle}>Confirm Account Deletion</Text>
-            <Text style={s.deleteWarning}>Enter your password to permanently delete your account. This cannot be undone.</Text>
-            <TextInput
-              style={s.input}
-              placeholder="Your password"
-              placeholderTextColor="#8BA89A"
-              secureTextEntry
-              value={deletePassword}
-              onChangeText={setDeletePassword}
-            />
-            <View style={s.modalRow}>
-              <TouchableOpacity style={s.cancelBtn} onPress={() => { setDeleteModal(false); setDeletePassword(''); }}>
-                <Text style={s.cancelBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={s.deleteConfirmBtn} onPress={handleDeleteAccount} disabled={deleting}>
-                <Text style={s.btnText}>{deleting ? 'Deleting...' : 'Delete'}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       <Modal visible={paywallModal} animationType="slide">
         <View style={s.paywallModalWrap}>
@@ -237,14 +205,6 @@ export default function ProfileScreen() {
             <Text style={s.modalTitle}>Change password</Text>
             <TextInput
               style={s.input}
-              placeholder="Current password"
-              placeholderTextColor="#8BA89A"
-              secureTextEntry
-              value={currentPassword}
-              onChangeText={setCurrentPassword}
-            />
-            <TextInput
-              style={s.input}
               placeholder="New password"
               placeholderTextColor="#8BA89A"
               secureTextEntry
@@ -260,7 +220,7 @@ export default function ProfileScreen() {
               onChangeText={setConfirmPassword}
             />
             <View style={s.modalRow}>
-              <TouchableOpacity style={s.cancelBtn} onPress={() => { setPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => { setPasswordModal(false); setNewPassword(''); setConfirmPassword(''); }}>
                 <Text style={s.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.submitBtn} onPress={handleChangePassword} disabled={changing}>
@@ -308,6 +268,4 @@ const s = StyleSheet.create({
   cancelBtnText: { fontSize: 15, fontWeight: '600', color: '#374151' },
   submitBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#2D6A4F', alignItems: 'center' },
   deleteBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#DC2626', borderRadius: 10, padding: 14, marginTop: 12 },
-  deleteWarning: { fontSize: 14, color: '#6B7280', lineHeight: 20, marginBottom: 16 },
-  deleteConfirmBtn: { flex: 1, padding: 14, borderRadius: 10, backgroundColor: '#DC2626', alignItems: 'center' },
 });
