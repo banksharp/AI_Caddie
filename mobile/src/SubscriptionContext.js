@@ -5,13 +5,13 @@ import * as api from './api';
 const SubscriptionContext = createContext(null);
 
 export function SubscriptionProvider({ children }) {
-  const { token } = useAuth();
+  const { user } = useAuth();
   const [subscriptionActive, setSubscriptionActive] = useState(false);
   const [subscriptionExpiresAt, setSubscriptionExpiresAt] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const refreshSubscription = useCallback(async () => {
-    if (!token) {
+    if (!user) {
       setSubscriptionActive(false);
       setSubscriptionExpiresAt(null);
       setLoading(false);
@@ -28,7 +28,7 @@ export function SubscriptionProvider({ children }) {
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   useEffect(() => {
     refreshSubscription();

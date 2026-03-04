@@ -5,7 +5,6 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
-import * as api from '../src/api';
 
 const logo = require('../assets/icon.png');
 
@@ -16,7 +15,7 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [busy, setBusy] = useState(false);
-  const { signIn } = useAuth();
+  const { signUp } = useAuth();
   const router = useRouter();
 
   async function handleRegister() {
@@ -26,9 +25,8 @@ export default function RegisterScreen() {
 
     setBusy(true);
     try {
-      const data = await api.register(firstName, lastName, email, password);
-      await signIn(data.access_token);
-      router.replace('/(tabs)');
+      await signUp(firstName, lastName, email, password);
+      router.replace({ pathname: '/verify-email', params: { email } });
     } catch (err) {
       Alert.alert('Registration Failed', err.message);
     } finally {

@@ -3,7 +3,7 @@ import { useAuth } from '../src/AuthContext';
 import { ActivityIndicator, View } from 'react-native';
 
 export default function Index() {
-  const { token, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -13,6 +13,12 @@ export default function Index() {
     );
   }
 
-  if (token) return <Redirect href="/(tabs)" />;
+  if (user) {
+    if (!user.email_confirmed_at) {
+      return <Redirect href={{ pathname: '/verify-email', params: { email: user.email } }} />;
+    }
+    return <Redirect href="/(tabs)" />;
+  }
+
   return <Redirect href="/login" />;
 }
