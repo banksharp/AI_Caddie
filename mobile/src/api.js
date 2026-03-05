@@ -1,5 +1,14 @@
 import { supabase } from './supabase';
 
+async function extractFunctionError(error) {
+  let msg = error.message;
+  try {
+    const body = await error.context?.json();
+    if (body?.detail) msg = body.detail;
+  } catch {}
+  return msg;
+}
+
 // ── Profile ──
 
 export async function getProfile() {
@@ -29,7 +38,7 @@ export async function verifySubscription(transactionId) {
   const { data, error } = await supabase.functions.invoke('subscription-verify', {
     body: { transactionId },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await extractFunctionError(error));
   return data;
 }
 
@@ -47,7 +56,7 @@ export async function deleteAccount() {
   const { data, error } = await supabase.functions.invoke('delete-account', {
     body: {},
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await extractFunctionError(error));
   return data;
 }
 
@@ -72,7 +81,7 @@ export async function getClubRecommendation(distance, lie, wind) {
   const { data, error } = await supabase.functions.invoke('club-recommendation', {
     body: { distance: parseFloat(distance), lie, wind },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await extractFunctionError(error));
   return data;
 }
 
@@ -80,7 +89,7 @@ export async function getCourseStrategy(hole_par, hole_length, hazards, hole_sha
   const { data, error } = await supabase.functions.invoke('course-strategy', {
     body: { hole_par, hole_length, hazards, hole_shape },
   });
-  if (error) throw new Error(error.message);
+  if (error) throw new Error(await extractFunctionError(error));
   return data;
 }
 

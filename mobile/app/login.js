@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, KeyboardAvoidingView, Platform, Image,
+  TouchableWithoutFeedback, Keyboard, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
@@ -29,7 +30,9 @@ export default function LoginScreen() {
   }
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
     <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={s.card}>
         <Image source={logo} style={s.logoImage} />
         <Text style={s.logo}>cAIddie</Text>
@@ -61,12 +64,15 @@ export default function LoginScreen() {
           <Text style={s.link}>Don't have an account? <Text style={s.linkBold}>Create one</Text></Text>
         </TouchableOpacity>
       </View>
+    </ScrollView>
     </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#2D6A4F', justifyContent: 'center', padding: 24 },
+  container: { flex: 1, backgroundColor: '#2D6A4F' },
+  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   card: { backgroundColor: '#fff', borderRadius: 16, padding: 28, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
   logoImage: { width: 120, height: 120, alignSelf: 'center', marginBottom: 12, borderRadius: 20 },
   logo: { fontSize: 32, fontWeight: '800', color: '#2D6A4F', textAlign: 'center' },
