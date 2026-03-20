@@ -21,6 +21,41 @@ try {
   iap = null;
 }
 
+/** True when StoreKit already has this subscription (e.g. canceled but still in paid period, or DB out of sync). */
+function isAlreadyOwnedError(err) {
+  const m = (err?.message || String(err || '')).toLowerCase();
+  const code = err?.code;
+  return (
+    m.includes('already owned') ||
+    m.includes('already purchased') ||
+    m.includes('item already owned') ||
+    m.includes('already subscribed') ||
+    code === 'E_ALREADY_OWNED' ||
+    code === 'E_ITEM_ALREADY_OWNED'
+  );
+}
+
+async function getTransactionIdForCurrentSubscription() {
+  if (!iap) return null;
+  await iap.initConnection();
+  await iap.restorePurchases();
+
+  // Include items that are still entitled until period end (e.g. canceled but not expired).
+  const purchases = await iap.getAvailablePurchases({
+    alsoPublishToEventListenerIOS: false,
+    onlyIncludeActiveItemsIOS: false,
+  });
+
+  const sub = Array.isArray(purchases)
+    ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
+    : null;
+
+  if (!sub) return null;
+  return Platform.OS === 'ios'
+    ? (sub.transactionId ?? null)
+    : (sub.purchaseToken ?? sub.transactionId ?? null);
+}
+
 async function connectAndPurchase() {
   if (!iap) throw new Error('In-app purchases not available in this build.');
 
@@ -39,13 +74,26 @@ async function connectAndPurchase() {
     );
   }
 
-  const result = await iap.requestPurchase({
-    request: {
-      apple: { sku: SUBSCRIPTION_PRODUCT_ID },
-      google: { skus: [SUBSCRIPTION_PRODUCT_ID] },
-    },
-    type: 'subs',
-  });
+  // If Apple still shows an entitlement (common after cancel-in-Settings + cleared server row), verify that instead of buying again.
+  const existingId = await getTransactionIdForCurrentSubscription();
+  if (existingId) return existingId;
+
+  let result;
+  try {
+    result = await iap.requestPurchase({
+      request: {
+        apple: { sku: SUBSCRIPTION_PRODUCT_ID },
+        google: { skus: [SUBSCRIPTION_PRODUCT_ID] },
+      },
+      type: 'subs',
+    });
+  } catch (err) {
+    if (isAlreadyOwnedError(err)) {
+      const tid = await getTransactionIdForCurrentSubscription();
+      if (tid) return tid;
+    }
+    throw err;
+  }
 
   const purchase = Array.isArray(result) ? result[0] : result;
   if (!purchase) throw new Error('Purchase was cancelled.');
@@ -62,21 +110,7 @@ async function connectAndPurchase() {
 async function connectAndRestore() {
   if (!iap) throw new Error('In-app purchases not available in this build.');
 
-  await iap.initConnection();
-  await iap.restorePurchases();
-
-  const purchases = await iap.getAvailablePurchases({
-    alsoPublishToEventListenerIOS: false,
-    onlyIncludeActiveItemsIOS: true,
-  });
-
-  const sub = Array.isArray(purchases)
-    ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
-    : null;
-
-  const transactionId = Platform.OS === 'ios'
-    ? (sub?.transactionId ?? null)
-    : (sub?.purchaseToken ?? sub?.transactionId ?? null);
+  const transactionId = await getTransactionIdForCurrentSubscription();
   if (!transactionId) throw new Error('No active subscription found for this account.');
 
   return transactionId;
