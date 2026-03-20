@@ -35,6 +35,7 @@ function isAlreadyOwnedError(err) {
   );
 }
 
+/** Used by Restore and by Subscribe only after Apple returns “already owned”. Not run before purchase — that skipped the sheet. */
 async function getTransactionIdForCurrentSubscription() {
   if (!iap) return null;
   await iap.initConnection();
@@ -74,10 +75,7 @@ async function connectAndPurchase() {
     );
   }
 
-  // If Apple still shows an entitlement (common after cancel-in-Settings + cleared server row), verify that instead of buying again.
-  const existingId = await getTransactionIdForCurrentSubscription();
-  if (existingId) return existingId;
-
+  // Subscribe: always show Apple’s purchase flow first. (Restore uses getTransactionIdForCurrentSubscription only.)
   let result;
   try {
     result = await iap.requestPurchase({
@@ -88,6 +86,7 @@ async function connectAndPurchase() {
       type: 'subs',
     });
   } catch (err) {
+    // Same entitlement on device but purchase sheet can’t run again — verify with StoreKit (differs from Restore: only after this error).
     if (isAlreadyOwnedError(err)) {
       const tid = await getTransactionIdForCurrentSubscription();
       if (tid) return tid;
