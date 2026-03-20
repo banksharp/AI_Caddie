@@ -10,15 +10,20 @@ import { useAuth } from '../src/AuthContext';
 const logo = require('../assets/icon.png');
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams();
-  const { signOut } = useAuth();
+  const { email, reason } = useLocalSearchParams();
+  const { signOut, clearAuthLinkError, user } = useAuth();
   const router = useRouter();
   const [resending, setResending] = useState(false);
+  const resendEmail = email || user?.email || '';
 
   async function handleResend() {
+    if (!resendEmail) {
+      Alert.alert('Missing email', 'Please sign in again and tap resend from this screen.');
+      return;
+    }
     setResending(true);
     try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email });
+      const { error } = await supabase.auth.resend({ type: 'signup', email: resendEmail });
       if (error) throw error;
       Alert.alert('Email Sent', 'A new verification email has been sent.');
     } catch (err) {
@@ -29,6 +34,7 @@ export default function VerifyEmailScreen() {
   }
 
   async function handleBackToLogin() {
+    clearAuthLinkError?.();
     await signOut();
     router.replace('/login');
   }
@@ -44,10 +50,15 @@ export default function VerifyEmailScreen() {
         <Text style={s.message}>
           We've sent a verification link to
         </Text>
-        <Text style={s.email}>{email || 'your email'}</Text>
+        <Text style={s.email}>{resendEmail || 'your email'}</Text>
         <Text style={s.message}>
           Please check your inbox and tap the link to activate your account.
         </Text>
+        {reason === 'otp_expired' ? (
+          <Text style={s.warning}>
+            Your previous verification link expired. Tap resend below for a new one.
+          </Text>
+        ) : null}
 
         <TouchableOpacity style={s.resendBtn} onPress={handleResend} disabled={resending}>
           <Ionicons name="refresh-outline" size={18} color="#2D6A4F" />
@@ -73,6 +84,7 @@ const s = StyleSheet.create({
   iconWrap: { marginBottom: 16 },
   title: { fontSize: 24, fontWeight: '800', color: '#1B4332', marginBottom: 12 },
   message: { fontSize: 15, color: '#6B7280', textAlign: 'center', lineHeight: 22 },
+  warning: { fontSize: 13, color: '#E07A00', textAlign: 'center', lineHeight: 20, marginTop: 10 },
   email: { fontSize: 16, fontWeight: '700', color: '#2D6A4F', marginVertical: 8 },
   resendBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,

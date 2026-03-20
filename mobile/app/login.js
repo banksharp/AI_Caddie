@@ -20,10 +20,19 @@ export default function LoginScreen() {
     if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
     setBusy(true);
     try {
-      await signIn(email, password);
+      const data = await signIn(email, password);
+      if (!data?.user?.email_confirmed_at) {
+        router.replace({ pathname: '/verify-email', params: { email } });
+        return;
+      }
       router.replace('/(tabs)');
     } catch (err) {
-      Alert.alert('Login Failed', err.message);
+      const msg = err?.message || 'Login failed';
+      if (msg.toLowerCase().includes('email not confirmed')) {
+        router.replace({ pathname: '/verify-email', params: { email } });
+      } else {
+        Alert.alert('Login Failed', msg);
+      }
     } finally {
       setBusy(false);
     }
