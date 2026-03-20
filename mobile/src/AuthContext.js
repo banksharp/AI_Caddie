@@ -14,9 +14,28 @@ function extractAuthCode(url) {
   }
 }
 
+function extractAuthError(url) {
+  if (!url) return null;
+  try {
+    const decoded = decodeURIComponent(url);
+    const errorCodeMatch = decoded.match(/[?&#]error_code=([^&#]+)/);
+    const errorDescriptionMatch = decoded.match(/[?&#]error_description=([^&#]+)/);
+    if (!errorCodeMatch && !errorDescriptionMatch) return null;
+    return {
+      code: errorCodeMatch ? errorCodeMatch[1] : 'unknown_error',
+      description: errorDescriptionMatch
+        ? errorDescriptionMatch[1].replace(/\+/g, ' ')
+        : 'Verification link is invalid or expired.',
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authLinkError, setAuthLinkError] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -36,7 +55,11 @@ export function AuthProvider({ children }) {
       const code = extractAuthCode(url);
       if (code) {
         await supabase.auth.exchangeCodeForSession(code);
+        setAuthLinkError(null);
+        return;
       }
+      const linkError = extractAuthError(url);
+      if (linkError) setAuthLinkError(linkError);
     }
 
     Linking.getInitialURL().then(handleDeepLink);
@@ -48,7 +71,10 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { first_name: firstName, last_name: lastName } },
+      options: {
+        data: { first_name: firstName, last_name: lastName },
+        emailRedirectTo: 'ai-caddie://auth/callback',
+      },
     });
     if (error) throw error;
     return data;
@@ -66,7 +92,18 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider
+      value={{
+        session,
+        user: session?.user ?? null,
+        loading,
+        signUp,
+        signIn,
+        signOut,
+        authLinkError,
+        clearAuthLinkError: () => setAuthLinkError(null),
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
