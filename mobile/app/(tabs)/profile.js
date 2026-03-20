@@ -32,8 +32,19 @@ export default function ProfileScreen() {
   async function loadProfile() {
     setLoading(true);
     try {
-      const data = await api.getProfile();
+      let data = await api.getProfile();
+      const stillActive =
+        data.subscription_expires_at && new Date(data.subscription_expires_at) > new Date();
+      if (stillActive) {
+        try {
+          await api.syncSubscription();
+          data = await api.getProfile();
+        } catch {
+          // keep last known profile if Apple sync fails
+        }
+      }
       setProfile(data);
+      await refreshSubscription();
     } catch (err) {
       Alert.alert('Error', err.message);
     } finally {
@@ -112,6 +123,7 @@ export default function ProfileScreen() {
   }
 
   const subscriptionActive = profile?.subscription_active ?? false;
+  const willRenew = profile?.subscription_will_renew !== false;
   const expiresAt = profile?.subscription_expires_at
     ? new Date(profile.subscription_expires_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
     : null;
@@ -134,7 +146,22 @@ export default function ProfileScreen() {
 
       <View style={s.card}>
         <Text style={s.cardTitle}>Subscription</Text>
-        {subscriptionActive ? (
+        {subscriptionActive && !willRenew ? (
+          <>
+            <View style={s.badgeCanceled}>
+              <Ionicons name="time-outline" size={20} color="#B45309" />
+              <Text style={s.badgeTextCanceled}>Canceled</Text>
+            </View>
+            <Text style={s.subText}>
+              Your subscription is canceled. You still have access until {expiresAt ?? 'the end of your billing period'}.
+            </Text>
+            <Text style={s.hint}>{"You won't be charged again. Manage in Settings → Subscriptions."}</Text>
+            <TouchableOpacity style={s.manageBtn} onPress={openManageSubscriptions}>
+              <Ionicons name="settings-outline" size={18} color="#2D6A4F" />
+              <Text style={s.manageBtnText}>Open subscription settings</Text>
+            </TouchableOpacity>
+          </>
+        ) : subscriptionActive ? (
           <>
             <View style={s.badge}>
               <Ionicons name="checkmark-circle" size={20} color="#2D6A4F" />
@@ -245,6 +272,8 @@ const s = StyleSheet.create({
   value: { fontSize: 16, color: '#1B4332', fontWeight: '500' },
   badge: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F0F7F4', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 8 },
   badgeText: { fontSize: 15, fontWeight: '700', color: '#2D6A4F' },
+  badgeCanceled: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#FEF3C7', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 8 },
+  badgeTextCanceled: { fontSize: 15, fontWeight: '700', color: '#B45309' },
   badgeInactive: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 8 },
   badgeTextInactive: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
   subText: { fontSize: 14, color: '#374151', marginBottom: 8 },
