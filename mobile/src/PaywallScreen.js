@@ -7,6 +7,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SUBSCRIPTION_PRODUCT_ID } from './constants';
@@ -49,7 +50,9 @@ async function connectAndPurchase() {
   const purchase = Array.isArray(result) ? result[0] : result;
   if (!purchase) throw new Error('Purchase was cancelled.');
 
-  const transactionId = purchase.transactionId ?? purchase.purchaseToken ?? null;
+  const transactionId = Platform.OS === 'ios'
+    ? (purchase.transactionId ?? null)
+    : (purchase.purchaseToken ?? purchase.transactionId ?? null);
   if (!transactionId) throw new Error('Could not get transaction ID.');
 
   try { await iap.finishTransaction({ purchase, isConsumable: false }); } catch {}
@@ -71,7 +74,9 @@ async function connectAndRestore() {
     ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
     : null;
 
-  const transactionId = sub?.transactionId ?? sub?.purchaseToken ?? null;
+  const transactionId = Platform.OS === 'ios'
+    ? (sub?.transactionId ?? null)
+    : (sub?.purchaseToken ?? sub?.transactionId ?? null);
   if (!transactionId) throw new Error('No active subscription found for this account.');
 
   return transactionId;

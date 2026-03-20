@@ -5,6 +5,10 @@ async function extractFunctionError(error) {
   try {
     const body = await error.context?.json();
     if (body?.detail) msg = body.detail;
+    if (body?.raw) {
+      const raw = typeof body.raw === 'string' ? body.raw : JSON.stringify(body.raw);
+      msg = `${msg}\n\nApple response: ${raw}`;
+    }
   } catch {}
   return msg;
 }
