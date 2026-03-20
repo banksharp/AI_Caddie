@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
-  TextInput, Modal, ActivityIndicator, ScrollView, Linking,
+  TextInput, Modal, ActivityIndicator, ScrollView, Linking, RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -22,33 +22,56 @@ export default function ProfileScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Load profile. If Supabase still shows time left on the sub, we sync with Apple
+   * before hiding the spinner so “Canceled” / will_renew matches reality — not a fast stale view.
+   */
+  const loadProfile = useCallback(
+    async ({ skipLoadingIndicator = false } = {}) => {
+      if (!skipLoadingIndicator) setLoading(true);
+      try {
+        const data = await api.getProfile();
+        const stillActive =
+          data.subscription_expires_at && new Date(data.subscription_expires_at) > new Date();
+
+        if (!stillActive) {
+          setProfile(data);
+          if (!skipLoadingIndicator) setLoading(false);
+          await refreshSubscription();
+          return;
+        }
+
+        try {
+          await api.syncSubscription();
+          const updated = await api.getProfile();
+          setProfile(updated);
+        } catch {
+          setProfile(data);
+        }
+        if (!skipLoadingIndicator) setLoading(false);
+        await refreshSubscription();
+      } catch (err) {
+        Alert.alert('Error', err.message);
+        if (!skipLoadingIndicator) setLoading(false);
+      }
+    },
+    [refreshSubscription],
+  );
 
   useFocusEffect(
     useCallback(() => {
       loadProfile();
-    }, [])
+    }, [loadProfile]),
   );
 
-  async function loadProfile() {
-    setLoading(true);
+  async function onPullRefresh() {
+    setRefreshing(true);
     try {
-      let data = await api.getProfile();
-      const stillActive =
-        data.subscription_expires_at && new Date(data.subscription_expires_at) > new Date();
-      if (stillActive) {
-        try {
-          await api.syncSubscription();
-          data = await api.getProfile();
-        } catch {
-          // keep last known profile if Apple sync fails
-        }
-      }
-      setProfile(data);
-      await refreshSubscription();
-    } catch (err) {
-      Alert.alert('Error', err.message);
+      await loadProfile({ skipLoadingIndicator: true });
     } finally {
-      setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -129,7 +152,13 @@ export default function ProfileScreen() {
     : null;
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={s.content}>
+    <ScrollView
+      style={s.container}
+      contentContainerStyle={s.content}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onPullRefresh} tintColor="#2D6A4F" />
+      }
+    >
       <View style={s.card}>
         <Text style={s.cardTitle}>Account</Text>
         <View style={s.row}>
