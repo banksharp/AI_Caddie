@@ -6,9 +6,11 @@ import {
 import * as api from '../../src/api';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 export default function CaddieScreen() {
-  const { subscriptionActive, loading: subLoading } = useSubscription();
+  const { subscriptionActive, loading: subLoading, refreshSubscription } = useSubscription();
   const [mode, setMode] = useState('club');
 
   // Club recommendation state
@@ -24,6 +26,12 @@ export default function CaddieScreen() {
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshSubscription();
+    }, [refreshSubscription]),
+  );
 
   function clearResult() {
     setResult(null);

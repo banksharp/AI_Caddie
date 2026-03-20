@@ -40,7 +40,13 @@ Deno.serve(async (req) => {
     const now = Math.floor(Date.now() / 1000);
     const token = await create(
       { alg: 'ES256', kid: keyId, typ: 'JWT' },
-      { iss: issuerId, iat: now, exp: getNumericDate(300), aud: 'appstoreconnect-api' },
+      {
+        iss: issuerId,
+        iat: now,
+        exp: getNumericDate(300),
+        aud: 'appstoreconnect-v1',
+        bid: bundleId,
+      },
       privateKey,
     );
 
@@ -57,29 +63,64 @@ Deno.serve(async (req) => {
       return json({ detail: 'Invalid or expired transaction', raw: err }, 400);
     }
 
-    const data = await r.json();
+    const data = await r.json() as {
+      signedTransactionInfo?: string;
+      signedRenewalInfo?: string;
+    };
     const signedTransactionInfo = data.signedTransactionInfo;
     if (!signedTransactionInfo) return json({ detail: 'No transaction info in response' }, 400);
 
     const parts = signedTransactionInfo.split('.');
     if (parts.length !== 3) return json({ detail: 'Invalid signed transaction' }, 400);
 
-    const payload = JSON.parse(atob(parts[1]));
+    const payload = JSON.parse(atob(parts[1])) as {
+      expiresDate?: number;
+      originalTransactionId?: string;
+    };
     const expirationMs = payload.expiresDate;
     if (!expirationMs) return json({ detail: 'Transaction has no expiration' }, 400);
 
     const expiresAt = new Date(expirationMs);
     if (expiresAt <= new Date()) return json({ detail: 'Subscription already expired' }, 400);
 
+    const originalTransactionId =
+      typeof payload.originalTransactionId === 'string' ? payload.originalTransactionId : null;
+
+    // autoRenewStatus: 1 = will renew, 0 = cancelled (access may continue until expiresDate)
+    let subscriptionWillRenew = true;
+    const signedRenewalInfo = data.signedRenewalInfo;
+    if (signedRenewalInfo && typeof signedRenewalInfo === 'string') {
+      const rParts = signedRenewalInfo.split('.');
+      if (rParts.length === 3) {
+        try {
+          const renewalPayload = JSON.parse(atob(rParts[1]));
+          if (renewalPayload.autoRenewStatus !== undefined) {
+            subscriptionWillRenew = renewalPayload.autoRenewStatus === 1;
+          }
+        } catch {
+          // keep default true
+        }
+      }
+    }
+
     const admin = getSupabaseAdmin();
-    const { error } = await admin
-      .from('profiles')
-      .update({ subscription_expires_at: expiresAt.toISOString() })
-      .eq('id', user.id);
+    const updatePayload: Record<string, unknown> = {
+      subscription_expires_at: expiresAt.toISOString(),
+      subscription_will_renew: subscriptionWillRenew,
+    };
+    if (originalTransactionId) {
+      updatePayload.apple_original_transaction_id = originalTransactionId;
+    }
+
+    const { error } = await admin.from('profiles').update(updatePayload).eq('id', user.id);
 
     if (error) return json({ detail: error.message }, 500);
 
-    return json({ subscription_active: true, subscription_expires_at: expiresAt.toISOString() });
+    return json({
+      subscription_active: true,
+      subscription_expires_at: expiresAt.toISOString(),
+      subscription_will_renew: subscriptionWillRenew,
+    });
   } catch (err) {
     return json({ detail: (err as Error).message }, 500);
   }

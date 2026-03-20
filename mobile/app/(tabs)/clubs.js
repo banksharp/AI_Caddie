@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as api from '../../src/api';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
+import { useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 const CLUB_LIST = [
   'Driver', '3-Wood', '5-Wood', '3-Hybrid', '4-Hybrid',
@@ -15,7 +17,7 @@ const CLUB_LIST = [
 ];
 
 export default function ClubsScreen() {
-  const { subscriptionActive, loading: subLoading } = useSubscription();
+  const { subscriptionActive, loading: subLoading, refreshSubscription } = useSubscription();
   const [savedClubs, setSavedClubs] = useState({});
   const [editClubs, setEditClubs] = useState({});
   const [editing, setEditing] = useState(false);
@@ -25,6 +27,12 @@ export default function ClubsScreen() {
   useEffect(() => {
     loadClubs();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshSubscription();
+    }, [refreshSubscription]),
+  );
 
   async function loadClubs() {
     try {

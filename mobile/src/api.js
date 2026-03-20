@@ -33,10 +33,17 @@ export async function getProfile() {
     clubs: data.clubs || {},
     subscription_active: data.subscription_expires_at ? new Date() < new Date(data.subscription_expires_at) : false,
     subscription_expires_at: data.subscription_expires_at,
+    subscription_will_renew: data.subscription_will_renew !== false,
   };
 }
 
 // ── Subscription ──
+
+export async function syncSubscription() {
+  const { data, error } = await supabase.functions.invoke('subscription-sync', { body: {} });
+  if (error) throw new Error(await extractFunctionError(error));
+  return data;
+}
 
 export async function verifySubscription(transactionId) {
   const { data, error } = await supabase.functions.invoke('subscription-verify', {
