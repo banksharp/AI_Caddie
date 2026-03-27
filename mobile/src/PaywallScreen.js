@@ -10,7 +10,11 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SUBSCRIPTION_PRODUCT_ID } from './constants';
+import {
+  SUBSCRIPTION_PRODUCT_IDS,
+  SUBSCRIPTION_PRODUCT_ID_MONTHLY,
+  SUBSCRIPTION_PRODUCT_ID_YEARLY,
+} from './constants';
 import * as api from './api';
 import { useSubscription } from './SubscriptionContext';
 
@@ -48,7 +52,7 @@ async function getTransactionIdForCurrentSubscription() {
   });
 
   const sub = Array.isArray(purchases)
-    ? purchases.find((p) => p.productId === SUBSCRIPTION_PRODUCT_ID)
+    ? purchases.find((p) => SUBSCRIPTION_PRODUCT_IDS.includes(p.productId))
     : null;
 
   if (!sub) return null;
@@ -57,19 +61,20 @@ async function getTransactionIdForCurrentSubscription() {
     : (sub.purchaseToken ?? sub.transactionId ?? null);
 }
 
-async function connectAndPurchase() {
+async function connectAndPurchase(productId) {
   if (!iap) throw new Error('In-app purchases not available in this build.');
+  if (!productId) throw new Error('Missing subscription product.');
 
   await iap.initConnection();
 
   const products = await iap.fetchProducts({
-    skus: [SUBSCRIPTION_PRODUCT_ID],
+    skus: SUBSCRIPTION_PRODUCT_IDS,
     type: 'subs',
   });
 
   if (!products || products.length === 0) {
     throw new Error(
-      `Subscription "${SUBSCRIPTION_PRODUCT_ID}" not found in the store. ` +
+      'Subscription products not found in the store. ' +
       'Please verify the product ID matches App Store Connect and that the ' +
       'subscription has a price, localization, and status "Ready to Submit".',
     );
@@ -80,8 +85,8 @@ async function connectAndPurchase() {
   try {
     result = await iap.requestPurchase({
       request: {
-        apple: { sku: SUBSCRIPTION_PRODUCT_ID },
-        google: { skus: [SUBSCRIPTION_PRODUCT_ID] },
+        apple: { sku: productId },
+        google: { skus: [productId] },
       },
       type: 'subs',
     });
@@ -119,11 +124,14 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
   const { refreshSubscription } = useSubscription();
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
+  const [plan, setPlan] = useState('monthly'); // 'monthly' | 'yearly'
 
   const handleSubscribe = async () => {
     setPurchasing(true);
     try {
-      const transactionId = await connectAndPurchase();
+      const productId =
+        plan === 'yearly' ? SUBSCRIPTION_PRODUCT_ID_YEARLY : SUBSCRIPTION_PRODUCT_ID_MONTHLY;
+      const transactionId = await connectAndPurchase(productId);
       await api.verifySubscription(transactionId);
       await refreshSubscription();
       onSubscribed?.();
@@ -169,6 +177,27 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           <FeatureRow text="Save and edit your club distances" />
         </View>
 
+        <View style={s.planRow}>
+          <TouchableOpacity
+            style={[s.planBtn, plan === 'monthly' && s.planBtnActive]}
+            onPress={() => setPlan('monthly')}
+            disabled={purchasing || restoring}
+          >
+            <Text style={[s.planBtnText, plan === 'monthly' && s.planBtnTextActive]}>
+              Monthly
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.planBtn, plan === 'yearly' && s.planBtnActive]}
+            onPress={() => setPlan('yearly')}
+            disabled={purchasing || restoring}
+          >
+            <Text style={[s.planBtnText, plan === 'yearly' && s.planBtnTextActive]}>
+              Yearly
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         <TouchableOpacity
           style={[s.primaryBtn, (purchasing || restoring) && s.btnDisabled]}
           onPress={handleSubscribe}
@@ -177,7 +206,9 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           {purchasing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={s.primaryBtnText}>Subscribe monthly</Text>
+            <Text style={s.primaryBtnText}>
+              {plan === 'yearly' ? 'Subscribe yearly' : 'Subscribe monthly'}
+            </Text>
           )}
         </TouchableOpacity>
 
@@ -253,6 +284,32 @@ const s = StyleSheet.create({
   features: {
     marginBottom: 24,
     gap: 12,
+  },
+  planRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 14,
+  },
+  planBtn: {
+    flex: 1,
+    backgroundColor: '#F0F7F4',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DDEAE4',
+  },
+  planBtnActive: {
+    backgroundColor: '#2D6A4F',
+    borderColor: '#2D6A4F',
+  },
+  planBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#2D6A4F',
+  },
+  planBtnTextActive: {
+    color: '#fff',
   },
   featureRow: {
     flexDirection: 'row',
