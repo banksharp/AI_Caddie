@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "AI Caddie",
-    "slug": "ai-caddie",
-    "version": "1.0.0",
+    "slug": "my-caiddie",
+    "version": "1.1.2",
     "orientation": "portrait",
     "scheme": "ai-caddie",
     "icon": "./assets/icon.png",
@@ -34,8 +34,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "72e2815a-f546-4b3e-a788-1b8d316f8995"
+        "projectId": "15ff3bf1-b636-412b-add6-830e1af3ee88"
       }
-    }
+    },
+    "owner": "banksharps-organization"
   }
 }
