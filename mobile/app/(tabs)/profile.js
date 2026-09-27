@@ -134,7 +134,7 @@ export default function ProfileScreen() {
     Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {
       Alert.alert(
         'Manage Subscription',
-        'Open Settings → Apple ID → Subscriptions to manage or cancel your AI Caddie subscription.',
+        'Open Settings → Apple ID → Subscriptions to manage or cancel your Club Sense subscription.',
       );
     });
   }

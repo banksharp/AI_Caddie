@@ -73,7 +73,7 @@ export function AuthProvider({ children }) {
       password,
       options: {
         data: { first_name: firstName, last_name: lastName },
-        emailRedirectTo: 'ai-caddie://auth/callback',
+        emailRedirectTo: 'clubsense://auth/callback',
       },
     });
     if (error) throw error;
