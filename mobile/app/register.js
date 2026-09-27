@@ -42,7 +42,7 @@ export default function RegisterScreen() {
       <View style={s.card}>
         <Image source={logo} style={s.logoImage} />
         <Text style={s.logo}>Create Account</Text>
-        <Text style={s.subtitle}>Join cAIddie and improve your game</Text>
+        <Text style={s.subtitle}>Join Club Sense and improve your game</Text>
 
         <View style={s.nameRow}>
           <TextInput

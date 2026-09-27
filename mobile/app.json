@@ -1,10 +1,10 @@
 {
   "expo": {
-    "name": "AI Caddie",
-    "slug": "my-caiddie",
+    "name": "Club Sense",
+    "slug": "club-sense",
     "version": "1.1.2",
     "orientation": "portrait",
-    "scheme": "ai-caddie",
+    "scheme": "clubsense",
     "icon": "./assets/icon.png",
     "splash": {
       "image": "./assets/splash.png",

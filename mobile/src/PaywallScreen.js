@@ -170,7 +170,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
         <View style={s.iconWrap}>
           <Ionicons name="golf" size={48} color="#2D6A4F" />
         </View>
-        <Text style={s.title}>{title ?? 'Unlock AI Caddie Pro'}</Text>
+        <Text style={s.title}>{title ?? 'Unlock Club Sense Pro'}</Text>
         <Text style={s.subtitle}>
           {subtitle ?? 'Get club recommendations and course strategy on every hole. Subscribe to unlock.'}
         </Text>
