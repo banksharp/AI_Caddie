@@ -1,11 +1,21 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { getSupabaseClient, getAuthUser, getProfile, isSubscriptionActive } from '../_shared/supabase.ts';
-import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.39.0';
+import {
+  formatClubs, generateStructured, jsonResponse, requireSubscriberClubs, toNumber, toText,
+} from '../_shared/ai.ts';
 
-function maybeParseJson(text: string) {
-  const trimmed = text.trim().replace(/^```(json)?/i, '').replace(/```$/i, '').trim();
-  try { return JSON.parse(trimmed); } catch { return null; }
-}
+const stringArray = { type: 'array', items: { type: 'string' } };
+
+const SCHEMA = {
+  type: 'object',
+  properties: {
+    recommendedClub: { type: 'string', description: 'The single club to hit, e.g. "7-Iron"' },
+    why: { ...stringArray, description: 'Short bullets explaining the choice' },
+    tips: { ...stringArray, description: 'Short execution tips for this shot' },
+    adjustments: { ...stringArray, description: 'Adjustments for lie/wind; may be empty' },
+  },
+  required: ['recommendedClub', 'why', 'tips', 'adjustments'],
+  additionalProperties: false,
+};
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,50 +23,40 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization')!;
-    const supabase = getSupabaseClient(authHeader);
-    const user = await getAuthUser(supabase);
-    if (!user) return new Response(JSON.stringify({ detail: 'Not authenticated' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    const gate = await requireSubscriberClubs(req);
+    if ('error' in gate) return gate.error;
 
-    const profile = await getProfile(supabase, user.id);
-    if (!profile) return new Response(JSON.stringify({ detail: 'Profile not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    if (!isSubscriptionActive(profile)) return new Response(JSON.stringify({ detail: 'Active subscription required', code: 'subscription_required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    const clubs = profile.clubs || {};
-    if (Object.keys(clubs).length === 0) return new Response(JSON.stringify({ detail: 'Club distances not set up' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-
-    const { distance, lie, wind } = await req.json();
-
-    let prompt = 'I need a club recommendation for my next golf shot. Here are my details:\nMy club distances:\n';
-    for (const [club, dist] of Object.entries(clubs)) {
-      prompt += `${club}: ${dist} yards\n`;
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ detail: 'Invalid JSON body' }, 400);
     }
-    prompt += `Current situation:
-    - Distance to hole: ${distance} yards
-    - Current lie: ${lie}
-    - Wind conditions: ${wind}
 
-    Return ONLY valid JSON with this exact shape (no markdown, no extra keys):
-    {
-      "recommendedClub": "7-Iron",
-      "why": ["bullet 1", "bullet 2"],
-      "tips": ["tip 1", "tip 2"],
-      "adjustments": ["optional bullet 1"]
-    }`;
+    const distance = toNumber(body?.distance);
+    if (distance === null || distance <= 0 || distance > 1000) {
+      return jsonResponse({ detail: 'distance must be a number of yards between 1 and 1000' }, 400);
+    }
+    const lie = toText(body.lie);
+    const wind = toText(body.wind);
+    if (!lie || !wind) return jsonResponse({ detail: 'lie and wind are required' }, 400);
 
-    const anthropic = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY')! });
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-5-20250929',
-      max_tokens: 1024,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const prompt = `I need a club recommendation for my next golf shot.
 
-    const raw = response.content[0].type === 'text' ? response.content[0].text : '';
-    const parsed = maybeParseJson(raw);
-    const body = parsed ? { data: parsed, status: 'success' } : { advice: raw, status: 'success', format: 'text' };
+My club distances:
+${formatClubs(gate.clubs)}
 
-    return new Response(JSON.stringify(body), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+Current situation:
+- Distance to hole: ${distance} yards
+- Current lie: ${lie}
+- Wind conditions: ${wind}
+
+Recommend one club from my bag. Keep each bullet short (one sentence). Use an empty adjustments list if none are needed.`;
+
+    const result = await generateStructured({ prompt, schema: SCHEMA, effort: 'low' });
+    return jsonResponse(result);
   } catch (err) {
-    return new Response(JSON.stringify({ detail: (err as Error).message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.error(err);
+    return jsonResponse({ detail: (err as Error).message }, 500);
   }
 });

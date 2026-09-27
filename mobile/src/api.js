@@ -55,7 +55,17 @@ export async function verifySubscription(transactionId) {
 
 // ── Password ──
 
-export async function changePassword(_currentPassword, newPassword) {
+export async function changePassword(currentPassword, newPassword) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  // Re-verify the current password so an unlocked phone alone can't change it.
+  const { error: verifyErr } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  });
+  if (verifyErr) throw new Error('Current password is incorrect');
+
   const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) throw new Error(error.message);
   return { message: 'Password updated' };
@@ -127,28 +137,22 @@ export async function startRound(courseName) {
 export async function addHole(roundId, holeData) {
   const { hole_number, par, strokes, fairway_hit, gir, notes } = holeData;
 
-  const { error: insertErr } = await supabase
+  // Upsert on (round_id, hole_number) so a retry or double-tap replaces the hole instead of
+  // duplicating it. rounds.total_score is kept in sync by a DB trigger (migration 005).
+  const { error: saveErr } = await supabase
     .from('holes')
-    .insert({
+    .upsert({
       round_id: roundId,
       hole_number,
-      par: par != null ? parseInt(par) : null,
+      par: par != null ? parseInt(par, 10) : null,
       strokes,
       putts: holeData.putts ?? null,
       fairway_hit: fairway_hit ?? null,
       gir: gir ?? null,
       notes: notes ?? null,
-    });
+    }, { onConflict: 'round_id,hole_number' });
 
-  if (insertErr) throw new Error(insertErr.message);
-
-  const { data: totalData } = await supabase
-    .from('holes')
-    .select('strokes')
-    .eq('round_id', roundId);
-
-  const totalScore = (totalData || []).reduce((sum, h) => sum + h.strokes, 0);
-  await supabase.from('rounds').update({ total_score: totalScore }).eq('id', roundId);
+  if (saveErr) throw new Error(saveErr.message);
 
   const { data: round, error: roundErr } = await supabase
     .from('rounds')
@@ -199,7 +203,10 @@ function formatRound(r) {
       };
     });
 
-  const totalStrokes = r.total_score ?? holes.reduce((sum, h) => sum + h.strokes, 0);
+  // Derive from the holes themselves so a stale stored total can never win.
+  const totalStrokes = holes.length > 0
+    ? holes.reduce((sum, h) => sum + h.strokes, 0)
+    : (r.total_score ?? 0);
   const totalPar = holes.filter((h) => h.par != null).reduce((sum, h) => sum + h.par, 0);
   const totalVsPar = totalPar > 0 ? totalStrokes - totalPar : null;
 
