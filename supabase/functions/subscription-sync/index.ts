@@ -1,25 +1,12 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseAdmin, getAuthUser } from '../_shared/supabase.ts';
-import { create, getNumericDate } from 'https://deno.land/x/djwt@v3.0.2/mod.ts';
-
-async function importPKCS8(pem: string) {
-  const b64 = pem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
-  const binary = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-  return await crypto.subtle.importKey('pkcs8', binary, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
-}
-
-function decodeJwsPayload(jws: string): Record<string, unknown> | null {
-  const parts = jws.split('.');
-  if (parts.length !== 3) return null;
-  try {
-    return JSON.parse(atob(parts[1]));
-  } catch {
-    return null;
-  }
-}
+import {
+  getAppleConfig,
+  getAppleBaseUrl,
+  createAppStoreToken,
+  decodeJwsPayload,
+  appAccountTokenMismatch,
+} from '../_shared/apple.ts';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -48,33 +35,13 @@ Deno.serve(async (req) => {
 
     const originalId = profile.apple_original_transaction_id as string;
 
-    const keyId = Deno.env.get('APPLE_KEY_ID')!;
-    const issuerId = Deno.env.get('APPLE_ISSUER_ID')!;
-    const privateKeyPem = Deno.env.get('APPLE_PRIVATE_KEY')!.replace(/\\n/g, '\n');
-    const bundleId = Deno.env.get('APPLE_BUNDLE_ID')!;
-    const sandbox = Deno.env.get('APPLE_SANDBOX') === 'true';
-
-    if (!keyId || !issuerId || !privateKeyPem || !bundleId) {
+    const appleConfig = getAppleConfig();
+    if (!appleConfig) {
       return json({ detail: 'Subscription sync not configured' }, 503);
     }
 
-    const privateKey = await importPKCS8(privateKeyPem);
-    const now = Math.floor(Date.now() / 1000);
-    const token = await create(
-      { alg: 'ES256', kid: keyId, typ: 'JWT' },
-      {
-        iss: issuerId,
-        iat: now,
-        exp: getNumericDate(300),
-        aud: 'appstoreconnect-v1',
-        bid: bundleId,
-      },
-      privateKey,
-    );
-
-    const baseUrl = sandbox
-      ? 'https://api.storekit-sandbox.itunes.apple.com'
-      : 'https://api.storekit.itunes.apple.com';
+    const token = await createAppStoreToken(appleConfig);
+    const baseUrl = getAppleBaseUrl(appleConfig);
 
     const r = await fetch(`${baseUrl}/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -106,12 +73,20 @@ Deno.serve(async (req) => {
     }
 
     const txPayload = decodeJwsPayload(signedTransactionInfo);
-    if (!txPayload?.expiresDate) {
+    if (!txPayload) {
+      return json({ ok: false, detail: 'Could not read transaction from Apple' }, 200);
+    }
+
+    // Purchases made with appAccountToken are bound to the account that bought them.
+    if (appAccountTokenMismatch(txPayload, user.id)) {
+      return json({ ok: false, detail: 'This App Store purchase belongs to a different account' }, 403);
+    }
+
+    if (typeof txPayload.expiresDate !== 'number') {
       return json({ ok: false, detail: 'Could not read expiration from Apple' }, 200);
     }
 
-    const expirationMs = txPayload.expiresDate as number;
-    const expiresAt = new Date(expirationMs);
+    const expiresAt = new Date(txPayload.expiresDate);
 
     let subscriptionWillRenew = true;
     if (signedRenewalInfo) {

@@ -17,6 +17,7 @@ import {
 } from './constants';
 import * as api from './api';
 import { useSubscription } from './SubscriptionContext';
+import { useAuth } from './AuthContext';
 
 let iap = null;
 try {
@@ -61,9 +62,10 @@ async function getTransactionIdForCurrentSubscription() {
     : (sub.purchaseToken ?? sub.transactionId ?? null);
 }
 
-async function connectAndPurchase(productId) {
+async function connectAndPurchase(productId, userId) {
   if (!iap) throw new Error('In-app purchases not available in this build.');
   if (!productId) throw new Error('Missing subscription product.');
+  if (!userId) throw new Error('You must be signed in to subscribe.');
 
   await iap.initConnection();
 
@@ -85,7 +87,8 @@ async function connectAndPurchase(productId) {
   try {
     result = await iap.requestPurchase({
       request: {
-        apple: { sku: productId },
+        // appAccountToken binds the Apple transaction to this account; the server rejects mismatches.
+        apple: { sku: productId, appAccountToken: userId },
         google: { skus: [productId] },
       },
       type: 'subs',
@@ -122,6 +125,7 @@ async function connectAndRestore() {
 
 export function PaywallScreen({ onSubscribed, title, subtitle }) {
   const { refreshSubscription } = useSubscription();
+  const { user } = useAuth();
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [plan, setPlan] = useState('monthly'); // 'monthly' | 'yearly'
@@ -131,7 +135,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
     try {
       const productId =
         plan === 'yearly' ? SUBSCRIPTION_PRODUCT_ID_YEARLY : SUBSCRIPTION_PRODUCT_ID_MONTHLY;
-      const transactionId = await connectAndPurchase(productId);
+      const transactionId = await connectAndPurchase(productId, user?.id);
       await api.verifySubscription(transactionId);
       await refreshSubscription();
       onSubscribed?.();

@@ -1,4 +1,4 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 export function getSupabaseClient(authHeader: string) {
   return createClient(
@@ -15,13 +15,13 @@ export function getSupabaseAdmin() {
   );
 }
 
-export async function getAuthUser(supabase: ReturnType<typeof createClient>) {
+export async function getAuthUser(supabase: SupabaseClient) {
   const { data: { user }, error } = await supabase.auth.getUser();
   if (error || !user) return null;
   return user;
 }
 
-export async function getProfile(supabase: ReturnType<typeof createClient>, userId: string) {
+export async function getProfile(supabase: SupabaseClient, userId: string) {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
