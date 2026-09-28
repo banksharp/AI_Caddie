@@ -36,13 +36,14 @@ export default function RoundScreen() {
   }
 
   async function handleAddHole() {
-    if (!strokes) return Alert.alert('Error', 'Please enter strokes');
+    const strokesNum = parseInt(strokes, 10);
+    if (!Number.isInteger(strokesNum) || strokesNum < 1) return Alert.alert('Error', 'Please enter a valid number of strokes');
     setBusy(true);
     try {
       const data = await api.addHole(roundId, {
         hole_number: holes.length + 1,
         par,
-        strokes: parseInt(strokes),
+        strokes: strokesNum,
         fairway_hit: fairway,
         gir,
         notes: notes || null,
