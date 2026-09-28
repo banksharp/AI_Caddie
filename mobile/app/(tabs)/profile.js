@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
   const [paywallModal, setPaywallModal] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
@@ -76,7 +77,7 @@ export default function ProfileScreen() {
   }
 
   async function handleChangePassword() {
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert('Error', 'Fill in all fields');
       return;
     }
@@ -90,9 +91,10 @@ export default function ProfileScreen() {
     }
     setChanging(true);
     try {
-      await api.changePassword(null, newPassword);
+      await api.changePassword(currentPassword, newPassword);
       Alert.alert('Success', 'Password updated');
       setPasswordModal(false);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (err) {
@@ -261,6 +263,14 @@ export default function ProfileScreen() {
             <Text style={s.modalTitle}>Change password</Text>
             <TextInput
               style={s.input}
+              placeholder="Current password"
+              placeholderTextColor="#8BA89A"
+              secureTextEntry
+              value={currentPassword}
+              onChangeText={setCurrentPassword}
+            />
+            <TextInput
+              style={s.input}
               placeholder="New password"
               placeholderTextColor="#8BA89A"
               secureTextEntry
@@ -276,7 +286,7 @@ export default function ProfileScreen() {
               onChangeText={setConfirmPassword}
             />
             <View style={s.modalRow}>
-              <TouchableOpacity style={s.cancelBtn} onPress={() => { setPasswordModal(false); setNewPassword(''); setConfirmPassword(''); }}>
+              <TouchableOpacity style={s.cancelBtn} onPress={() => { setPasswordModal(false); setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); }}>
                 <Text style={s.cancelBtnText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity style={s.submitBtn} onPress={handleChangePassword} disabled={changing}>
