@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Club Sense",
-    "slug": "club-sense",
-    "version": "1.1.2",
+    "slug": "my-caiddie",
+    "version": "1.2.0",
     "orientation": "portrait",
     "scheme": "clubsense",
     "icon": "./assets/icon.png",
