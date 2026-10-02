@@ -76,6 +76,7 @@ export default function VerifyEmailScreen() {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#2D6A4F', justifyContent: 'center', padding: 24 },
   card: {
+    width: '100%', maxWidth: 520, alignSelf: 'center',
     backgroundColor: '#fff', borderRadius: 16, padding: 28,
     shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
     alignItems: 'center',

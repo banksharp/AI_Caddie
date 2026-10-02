@@ -51,7 +51,8 @@ export function GreenBookInput({ style, onFocus, onBlur, ...props }) {
 export const gb = StyleSheet.create({
   fill: { flex: 1, backgroundColor: colors.ground },
   image: { backgroundColor: colors.ground },
-  scrollContent: { flexGrow: 1, paddingHorizontal: 30, paddingTop: 96, paddingBottom: 36 },
+  // Centered column so the form doesn't stretch across an iPad screen.
+  scrollContent: { flexGrow: 1, paddingHorizontal: 30, paddingTop: 96, paddingBottom: 36, width: '100%', maxWidth: 560, alignSelf: 'center' },
   mark: { width: 48, height: 48, borderRadius: 12 },
   word: { marginTop: 18, fontSize: 36, color: colors.text, fontWeight: '700', letterSpacing: -0.6 },
   wordFont: { fontFamily: 'BricolageGrotesque_700Bold', fontWeight: 'normal' },

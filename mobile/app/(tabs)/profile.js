@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
-  TextInput, Modal, ActivityIndicator, ScrollView, Linking, RefreshControl, AppState,
+  TextInput, Modal, ActivityIndicator, ScrollView, Linking, RefreshControl, AppState, Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,11 +9,13 @@ import * as api from '../../src/api';
 import { useAuth } from '../../src/AuthContext';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
+import { useTournamentMode } from '../../src/settings';
 
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
   const { applySubscription } = useSubscription();
+  const [tournamentMode, setTournamentMode] = useTournamentMode();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
@@ -257,6 +259,21 @@ export default function ProfileScreen() {
       </View>
 
       <View style={s.card}>
+        <Text style={s.cardTitle}>On the course</Text>
+        <View style={s.switchRow}>
+          <Ionicons name="trophy-outline" size={20} color="#2D6A4F" />
+          <Text style={s.switchLabel}>Tournament mode</Text>
+          <Switch
+            value={tournamentMode}
+            onValueChange={setTournamentMode}
+            trackColor={{ true: '#2D6A4F' }}
+            accessibilityLabel="Tournament mode"
+          />
+        </View>
+        <Text style={s.hint}>Hides Ask Club Sense during rounds so only distances show, for competitions.</Text>
+      </View>
+
+      <View style={s.card}>
         <Text style={s.cardTitle}>Password</Text>
         <TouchableOpacity style={s.btn} onPress={() => setPasswordModal(true)}>
           <Ionicons name="key-outline" size={20} color="#fff" />
@@ -333,7 +350,8 @@ export default function ProfileScreen() {
 const s = StyleSheet.create({
   center: { flex: 1, backgroundColor: '#F0F7F4', justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: '#F0F7F4' },
-  content: { padding: 16, paddingBottom: 40 },
+  // Centered column so cards don't stretch across an iPad screen.
+  content: { padding: 16, paddingBottom: 40, width: '100%', maxWidth: 640, alignSelf: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, marginBottom: 16, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   cardTitle: { fontSize: 18, fontWeight: '700', color: '#1B4332', marginBottom: 14 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
@@ -346,6 +364,8 @@ const s = StyleSheet.create({
   badgeInactive: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 8 },
   badgeTextInactive: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
   subText: { fontSize: 14, color: '#374151', marginBottom: 8 },
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  switchLabel: { flex: 1, fontSize: 16, color: '#1B4332', fontWeight: '600' },
   syncRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   syncText: { fontSize: 13, color: '#6B7280' },
   hint: { fontSize: 13, color: '#6B7280', lineHeight: 18 },

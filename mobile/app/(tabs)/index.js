@@ -217,7 +217,8 @@ export default function CaddieScreen() {
 const s = StyleSheet.create({
   center: { flex: 1, backgroundColor: '#F0F7F4', justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: '#F0F7F4' },
-  content: { padding: 16, paddingBottom: 40 },
+  // Centered column so cards don't stretch across an iPad screen.
+  content: { padding: 16, paddingBottom: 40, width: '100%', maxWidth: 640, alignSelf: 'center' },
   toggle: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10, padding: 4, marginBottom: 16 },
   toggleBtn: { flex: 1, padding: 10, borderRadius: 8, alignItems: 'center' },
   toggleActive: { backgroundColor: '#2D6A4F' },

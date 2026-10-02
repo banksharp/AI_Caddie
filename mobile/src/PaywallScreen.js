@@ -278,6 +278,9 @@ const s = StyleSheet.create({
     padding: 24,
   },
   card: {
+    width: '100%',
+    maxWidth: 520,
+    alignSelf: 'center',
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 28,
