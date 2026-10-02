@@ -40,6 +40,27 @@ function isAlreadyOwnedError(err) {
   );
 }
 
+/**
+ * Picks the subscription purchase that is still entitled (latest expiry), or null if none is.
+ * StoreKit also returns old renewals and lapsed subscriptions; sending one of those to the
+ * server only produces "Subscription already expired".
+ */
+function pickActiveSubscription(purchases) {
+  const subs = (Array.isArray(purchases) ? purchases : [])
+    .filter((p) => SUBSCRIPTION_PRODUCT_IDS.includes(p.productId));
+  if (subs.length === 0) return null;
+
+  subs.sort((a, b) =>
+    ((b.expirationDateIOS ?? 0) - (a.expirationDateIOS ?? 0)) ||
+    ((b.transactionDate ?? 0) - (a.transactionDate ?? 0)));
+  const latest = subs[0];
+
+  if (Platform.OS === 'ios' && latest.expirationDateIOS && latest.expirationDateIOS <= Date.now()) {
+    return null;
+  }
+  return latest;
+}
+
 /** Used by Restore and by Subscribe only after Apple returns “already owned”. Not run before purchase — that skipped the sheet. */
 async function getTransactionIdForCurrentSubscription() {
   if (!iap) return null;
@@ -52,9 +73,7 @@ async function getTransactionIdForCurrentSubscription() {
     onlyIncludeActiveItemsIOS: false,
   });
 
-  const sub = Array.isArray(purchases)
-    ? purchases.find((p) => SUBSCRIPTION_PRODUCT_IDS.includes(p.productId))
-    : null;
+  const sub = pickActiveSubscription(purchases);
 
   if (!sub) return null;
   return Platform.OS === 'ios'
