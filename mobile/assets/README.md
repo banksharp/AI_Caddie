@@ -14,3 +14,5 @@ Add these image files here so the app logo and splash screen work:
 - For splash, use the same image or a wider version (e.g. 1024×1024 centered on green) and save as `splash.png`.
 
 After adding the files, rebuild the app (`npx expo prebuild --clean` then run, or `eas build`) so the new icon and splash are used.
+
+**Source:** the Club Sense artwork is drawn in `source/*.svg`. Edit those and re-render to 1024×1024 PNG (e.g. `npx @resvg/resvg-js-cli --fit-width 1024 source/icon.svg icon.png`); strip the alpha channel from `icon.png` before submitting to the App Store.

@@ -122,7 +122,7 @@ export default function CaddieScreen() {
 
       {!!result && (
         <View style={s.resultCard}>
-          <Text style={s.resultTitle}>AI Caddie Says:</Text>
+          <Text style={s.resultTitle}>Club Sense Says:</Text>
           {hasData ? (
             mode === 'club' ? (
               <View style={{ gap: 14 }}>
