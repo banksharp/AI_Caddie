@@ -3,6 +3,7 @@ import { getSupabaseClient, getSupabaseAdmin, getAuthUser } from '../_shared/sup
 import {
   getAppleConfig,
   appleGet,
+  getSubscriptionState,
   decodeJwsPayload,
   appAccountTokenMismatch,
 } from '../_shared/apple.ts';
@@ -29,7 +30,8 @@ Deno.serve(async (req) => {
     const appleConfig = getAppleConfig();
     if (!appleConfig) return json({ detail: 'Subscription verification not configured' }, 503);
 
-    const r = await appleGet(appleConfig, `/inApps/v1/transactions/${encodeURIComponent(transactionId)}`);
+    const { response: r, environment } =
+      await appleGet(appleConfig, `/inApps/v1/transactions/${encodeURIComponent(transactionId)}`);
 
     if (!r.ok) {
       const err = await r.text();
@@ -51,14 +53,15 @@ Deno.serve(async (req) => {
       return json({ detail: 'This App Store purchase belongs to a different account' }, 403);
     }
 
-    const expirationMs = typeof payload.expiresDate === 'number' ? payload.expiresDate : null;
-    if (!expirationMs) return json({ detail: 'Transaction has no expiration' }, 400);
-
-    const expiresAt = new Date(expirationMs);
-    if (expiresAt <= new Date()) return json({ detail: 'Subscription already expired' }, 400);
-
     const originalTransactionId =
       typeof payload.originalTransactionId === 'string' ? payload.originalTransactionId : null;
+
+    // The device may send any transaction in the subscription's renewal chain, and each one only
+    // covers a single period. Use the subscription's latest state, from the environment the
+    // transaction was found in, rather than this transaction's own expiry.
+    let expirationMs = typeof payload.expiresDate === 'number' ? payload.expiresDate : null;
+    let latestStatus: number | null = null;
+    let statusLookupError: string | undefined;
 
     // autoRenewStatus: 1 = will renew, 0 = cancelled (access may continue until expiresDate)
     let subscriptionWillRenew = true;
@@ -68,6 +71,39 @@ Deno.serve(async (req) => {
       if (renewalPayload?.autoRenewStatus !== undefined) {
         subscriptionWillRenew = renewalPayload.autoRenewStatus === 1;
       }
+    }
+
+    if (originalTransactionId) {
+      const { state, error: stateErr } = await getSubscriptionState(appleConfig, environment, originalTransactionId);
+      if (state) {
+        if (appAccountTokenMismatch(state.transaction, user.id)) {
+          return json({ detail: 'This App Store purchase belongs to a different account' }, 403);
+        }
+        if (state.expiresMs && (!expirationMs || state.expiresMs > expirationMs)) expirationMs = state.expiresMs;
+        subscriptionWillRenew = state.willRenew;
+        latestStatus = state.status;
+      } else {
+        statusLookupError = stateErr;
+      }
+    }
+
+    if (!expirationMs) return json({ detail: 'Transaction has no expiration' }, 400);
+
+    const expiresAt = new Date(expirationMs);
+    if (expiresAt <= new Date()) {
+      return json({
+        detail: 'Subscription already expired',
+        raw: {
+          environment,
+          transactionId,
+          originalTransactionId,
+          productId: payload.productId ?? null,
+          sentTransactionExpires: typeof payload.expiresDate === 'number' ? new Date(payload.expiresDate).toISOString() : null,
+          latestExpires: expiresAt.toISOString(),
+          latestStatus,
+          statusLookupError: statusLookupError ?? null,
+        },
+      }, 400);
     }
 
     const admin = getSupabaseAdmin();

@@ -32,15 +32,69 @@ const APPLE_SANDBOX_URL = 'https://api.storekit-sandbox.itunes.apple.com';
  * when production returns 404 (Apple's recommended approach). Real App Store purchases
  * resolve in production; TestFlight and App Review purchases exist only in sandbox.
  */
-export async function appleGet(config: AppleConfig, path: string) {
-  const token = await createAppStoreToken(config);
-  const headers = { Authorization: `Bearer ${token}` };
+export type AppleEnvironment = 'Production' | 'Sandbox';
 
-  const production = await fetch(`${APPLE_PRODUCTION_URL}${path}`, { headers });
-  if (production.status !== 404) return production;
+export async function appleGet(config: AppleConfig, path: string) {
+  const production = await appleGetIn(config, 'Production', path);
+  if (production.status !== 404) return { response: production, environment: 'Production' as AppleEnvironment };
 
   await production.body?.cancel();
-  return await fetch(`${APPLE_SANDBOX_URL}${path}`, { headers });
+  return { response: await appleGetIn(config, 'Sandbox', path), environment: 'Sandbox' as AppleEnvironment };
+}
+
+/** GETs an App Store Server API path in one specific environment. */
+export async function appleGetIn(config: AppleConfig, environment: AppleEnvironment, path: string) {
+  const token = await createAppStoreToken(config);
+  const baseUrl = environment === 'Production' ? APPLE_PRODUCTION_URL : APPLE_SANDBOX_URL;
+  return await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export interface SubscriptionState {
+  expiresMs: number | null;
+  willRenew: boolean;
+  /** Apple status: 1 active, 2 expired, 3 billing retry, 4 grace period, 5 revoked. */
+  status: number | null;
+  transaction: Record<string, unknown>;
+}
+
+/**
+ * Current state of a subscription from Apple's Get All Subscription Statuses endpoint.
+ * A single transaction only covers one billing period (minutes long in sandbox, where
+ * renewals are accelerated), so checking whichever transaction the device sent can report
+ * an active subscription as expired. This returns the latest transaction for the chain.
+ */
+export async function getSubscriptionState(
+  config: AppleConfig,
+  environment: AppleEnvironment,
+  originalTransactionId: string,
+): Promise<{ state: SubscriptionState | null; error?: string }> {
+  const r = await appleGetIn(config, environment, `/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`);
+  if (!r.ok) return { state: null, error: await r.text() };
+
+  const body = await r.json() as {
+    data?: Array<{ lastTransactions?: Array<{ originalTransactionId?: string; status?: number; signedTransactionInfo?: string; signedRenewalInfo?: string }> }>;
+  };
+  const items = (body.data ?? []).flatMap((g) => g.lastTransactions ?? []);
+  const item = items.find((t) => t.originalTransactionId === originalTransactionId) ?? items[0];
+  if (!item?.signedTransactionInfo) return { state: null, error: 'No subscription transactions from Apple' };
+
+  const transaction = decodeJwsPayload(item.signedTransactionInfo);
+  if (!transaction) return { state: null, error: 'Could not read transaction from Apple' };
+
+  let willRenew = true;
+  if (item.signedRenewalInfo) {
+    const renewal = decodeJwsPayload(item.signedRenewalInfo);
+    if (renewal?.autoRenewStatus !== undefined) willRenew = renewal.autoRenewStatus === 1;
+  }
+
+  return {
+    state: {
+      expiresMs: typeof transaction.expiresDate === 'number' ? transaction.expiresDate : null,
+      willRenew,
+      status: typeof item.status === 'number' ? item.status : null,
+      transaction,
+    },
+  };
 }
 
 async function importPKCS8(pem: string) {

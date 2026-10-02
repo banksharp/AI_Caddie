@@ -39,7 +39,7 @@ Deno.serve(async (req) => {
       return json({ detail: 'Subscription sync not configured' }, 503);
     }
 
-    const r = await appleGet(appleConfig, `/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`);
+    const { response: r } = await appleGet(appleConfig, `/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`);
 
     if (!r.ok) {
       const err = await r.text();
