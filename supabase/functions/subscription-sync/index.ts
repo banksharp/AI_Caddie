@@ -2,8 +2,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseAdmin, getAuthUser } from '../_shared/supabase.ts';
 import {
   getAppleConfig,
-  getAppleBaseUrl,
-  createAppStoreToken,
+  appleGet,
   decodeJwsPayload,
   appAccountTokenMismatch,
 } from '../_shared/apple.ts';
@@ -40,12 +39,7 @@ Deno.serve(async (req) => {
       return json({ detail: 'Subscription sync not configured' }, 503);
     }
 
-    const token = await createAppStoreToken(appleConfig);
-    const baseUrl = getAppleBaseUrl(appleConfig);
-
-    const r = await fetch(`${baseUrl}/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const r = await appleGet(appleConfig, `/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`);
 
     if (!r.ok) {
       const err = await r.text();
