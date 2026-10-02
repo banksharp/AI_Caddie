@@ -44,7 +44,7 @@ export default function LoginScreen() {
     <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
       <View style={s.card}>
         <Image source={logo} style={s.logoImage} />
-        <Text style={s.logo}>cAIddie</Text>
+        <Text style={s.logo}>Club Sense</Text>
         <Text style={s.subtitle}>Your AI-powered golf assistant</Text>
 
         <TextInput

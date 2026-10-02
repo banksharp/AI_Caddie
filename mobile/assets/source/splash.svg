@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024"><rect width="1024" height="1024" fill="#2D6A4F"/><g transform="translate(512 430) scale(0.55) translate(-512 -512)">
+  <!-- putting green -->
+  <ellipse cx="512" cy="792" rx="340" ry="74" fill="#40916C"/>
+  <ellipse cx="512" cy="792" rx="250" ry="48" fill="#52B788" opacity="0.35"/>
+  <!-- cup -->
+  <ellipse cx="500" cy="792" rx="58" ry="15" fill="#0B2B1F"/>
+  <!-- ball -->
+  <circle cx="640" cy="772" r="30" fill="#FFFFFF"/>
+  <!-- pin -->
+  <rect x="489" y="236" width="22" height="560" rx="11" fill="#FFFFFF"/>
+  <!-- flag -->
+  <path d="M511 244 L752 322 Q764 326 752 331 L511 412 Z" fill="#B7E4C7"/>
+  <!-- sense waves -->
+  <path d="M430 262 A95 95 0 0 0 430 392" fill="none" stroke="#B7E4C7" stroke-width="26" stroke-linecap="round"/>
+  <path d="M362 222 A170 170 0 0 0 362 432" fill="none" stroke="#B7E4C7" stroke-width="26" stroke-linecap="round" opacity="0.6"/>
+</g>
+<text x="512" y="760" text-anchor="middle" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="104" font-weight="700" fill="#FFFFFF" letter-spacing="2">Club Sense</text>
+</svg>
