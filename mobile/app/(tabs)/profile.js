@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, TouchableOpacity, StyleSheet, Alert,
-  TextInput, Modal, ActivityIndicator, ScrollView, Linking, RefreshControl,
+  TextInput, Modal, ActivityIndicator, ScrollView, Linking, RefreshControl, AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -10,10 +10,12 @@ import { useAuth } from '../../src/AuthContext';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
 
+const APPLE_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
-  const { refreshSubscription } = useSubscription();
+  const { applySubscription } = useSubscription();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [passwordModal, setPasswordModal] = useState(false);
@@ -24,42 +26,69 @@ export default function ProfileScreen() {
   const [changing, setChanging] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const hasLoadedRef = useRef(false);
+  const lastSyncRef = useRef(0);
+  const managingSubscriptionRef = useRef(false);
 
   /**
-   * Load profile. If Supabase still shows time left on the sub, we sync with Apple
-   * before hiding the spinner so “Canceled” / will_renew matches reality — not a fast stale view.
+   * Show the stored profile immediately, then confirm the subscription with Apple in the
+   * background and update the card if anything changed (e.g. canceled in Settings).
+   * Apple is only asked when there is an Apple subscription that the database still shows as
+   * active, and at most every few minutes unless forced (pull-to-refresh, back from Settings).
    */
   const loadProfile = useCallback(
-    async ({ skipLoadingIndicator = false } = {}) => {
-      if (!skipLoadingIndicator) setLoading(true);
+    async ({ forceSync = false } = {}) => {
+      if (!hasLoadedRef.current) setLoading(true);
+      let data;
       try {
-        const data = await api.getProfile();
-        const stillActive =
-          data.subscription_expires_at && new Date(data.subscription_expires_at) > new Date();
-
-        if (!stillActive) {
-          setProfile(data);
-          if (!skipLoadingIndicator) setLoading(false);
-          await refreshSubscription();
-          return;
-        }
-
-        try {
-          await api.syncSubscription();
-          const updated = await api.getProfile();
-          setProfile(updated);
-        } catch {
-          setProfile(data);
-        }
-        if (!skipLoadingIndicator) setLoading(false);
-        await refreshSubscription();
+        data = await api.getProfile();
       } catch (err) {
         Alert.alert('Error', err.message);
-        if (!skipLoadingIndicator) setLoading(false);
+        setLoading(false);
+        return;
+      }
+      hasLoadedRef.current = true;
+      setProfile(data);
+      applySubscription(data);
+      setLoading(false);
+
+      const syncDue = forceSync || Date.now() - lastSyncRef.current > APPLE_SYNC_INTERVAL_MS;
+      if (!data.has_apple_subscription || !data.subscription_active || !syncDue) return;
+
+      setSyncing(true);
+      try {
+        const result = await api.syncSubscription();
+        lastSyncRef.current = Date.now();
+        if (result?.ok) {
+          const updated = {
+            ...data,
+            subscription_active: result.subscription_active,
+            subscription_expires_at: result.subscription_expires_at,
+            subscription_will_renew: result.subscription_will_renew,
+          };
+          setProfile(updated);
+          applySubscription(updated);
+        }
+      } catch {
+        // Keep showing the stored status; the next visit retries.
+      } finally {
+        setSyncing(false);
       }
     },
-    [refreshSubscription],
+    [applySubscription],
   );
+
+  // Coming back from the App Store subscription page: re-check with Apple right away.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && managingSubscriptionRef.current) {
+        managingSubscriptionRef.current = false;
+        loadProfile({ forceSync: true });
+      }
+    });
+    return () => sub.remove();
+  }, [loadProfile]);
 
   useFocusEffect(
     useCallback(() => {
@@ -70,7 +99,7 @@ export default function ProfileScreen() {
   async function onPullRefresh() {
     setRefreshing(true);
     try {
-      await loadProfile({ skipLoadingIndicator: true });
+      await loadProfile({ forceSync: true });
     } finally {
       setRefreshing(false);
     }
@@ -131,6 +160,7 @@ export default function ProfileScreen() {
   }
 
   function openManageSubscriptions() {
+    managingSubscriptionRef.current = true;
     Linking.openURL('https://apps.apple.com/account/subscriptions').catch(() => {
       Alert.alert(
         'Manage Subscription',
@@ -177,6 +207,12 @@ export default function ProfileScreen() {
 
       <View style={s.card}>
         <Text style={s.cardTitle}>Subscription</Text>
+        {syncing && (
+          <View style={s.syncRow}>
+            <ActivityIndicator size="small" color="#6B7280" />
+            <Text style={s.syncText}>Checking with Apple…</Text>
+          </View>
+        )}
         {subscriptionActive && !willRenew ? (
           <>
             <View style={s.badgeCanceled}>
@@ -250,7 +286,6 @@ export default function ProfileScreen() {
           <PaywallScreen
             onSubscribed={() => {
               setPaywallModal(false);
-              refreshSubscription();
               loadProfile();
             }}
           />
@@ -316,6 +351,8 @@ const s = StyleSheet.create({
   badgeInactive: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#F3F4F6', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, alignSelf: 'flex-start', marginBottom: 8 },
   badgeTextInactive: { fontSize: 15, fontWeight: '600', color: '#6B7280' },
   subText: { fontSize: 14, color: '#374151', marginBottom: 8 },
+  syncRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+  syncText: { fontSize: 13, color: '#6B7280' },
   hint: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
   manageBtn: { marginTop: 10, alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6 },
   manageBtnText: { fontSize: 14, fontWeight: '600', color: '#2D6A4F' },

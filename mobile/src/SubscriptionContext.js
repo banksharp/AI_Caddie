@@ -34,6 +34,12 @@ export function SubscriptionProvider({ children }) {
     refreshSubscription();
   }, [refreshSubscription]);
 
+  /** Updates the shared status from profile data the caller already has, without refetching. */
+  const applySubscription = useCallback((profile) => {
+    setSubscriptionActive(profile?.subscription_active ?? false);
+    setSubscriptionExpiresAt(profile?.subscription_expires_at ?? null);
+  }, []);
+
   return (
     <SubscriptionContext.Provider
       value={{
@@ -41,6 +47,7 @@ export function SubscriptionProvider({ children }) {
         subscriptionExpiresAt,
         loading,
         refreshSubscription,
+        applySubscription,
       }}
     >
       {children}

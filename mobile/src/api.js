@@ -13,10 +13,17 @@ async function extractFunctionError(error) {
   return msg;
 }
 
+// The signed-in user from the locally stored session. Unlike auth.getUser() this makes no
+// network request; the database still checks the session token on every query (RLS).
+async function getSessionUser() {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.user ?? null;
+}
+
 // ── Profile ──
 
 export async function getProfile() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -34,6 +41,7 @@ export async function getProfile() {
     subscription_active: data.subscription_expires_at ? new Date() < new Date(data.subscription_expires_at) : false,
     subscription_expires_at: data.subscription_expires_at,
     subscription_will_renew: data.subscription_will_renew !== false,
+    has_apple_subscription: !!data.apple_original_transaction_id,
   };
 }
 
@@ -56,7 +64,7 @@ export async function verifySubscription(transactionId) {
 // ── Password ──
 
 export async function changePassword(currentPassword, newPassword) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
   // Re-verify the current password so an unlocked phone alone can't change it.
@@ -84,7 +92,7 @@ export async function deleteAccount() {
 // ── Clubs ──
 
 export async function setupClubs(clubs) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
   const { error } = await supabase
@@ -117,7 +125,7 @@ export async function getCourseStrategy(hole_par, hole_length, hazards, hole_sha
 // ── Rounds ──
 
 export async function startRound(courseName) {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
@@ -165,7 +173,7 @@ export async function addHole(roundId, holeData) {
 }
 
 export async function getRounds() {
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
   const { data, error } = await supabase
