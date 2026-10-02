@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity,
+  View, Text, TouchableOpacity,
   StyleSheet, Alert, KeyboardAvoidingView, Platform, Image,
   TouchableWithoutFeedback, Keyboard, ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/AuthContext';
+import { GreenBookBackground, GreenBookInput, gb, useGreenBookFonts } from '../src/GreenBook';
 
 const logo = require('../assets/icon.png');
 
@@ -15,6 +16,7 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const { signIn } = useAuth();
   const router = useRouter();
+  const fontsLoaded = useGreenBookFonts();
 
   async function handleLogin() {
     if (!email || !password) return Alert.alert('Error', 'Please fill in all fields');
@@ -39,56 +41,49 @@ export default function LoginScreen() {
   }
 
   return (
+    <GreenBookBackground>
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-    <KeyboardAvoidingView style={s.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-    <ScrollView contentContainerStyle={s.scrollContent} keyboardShouldPersistTaps="handled">
-      <View style={s.card}>
-        <Image source={logo} style={s.logoImage} />
-        <Text style={s.logo}>Club Sense</Text>
-        <Text style={s.subtitle}>Your AI-powered golf assistant</Text>
+    <KeyboardAvoidingView style={s.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <ScrollView contentContainerStyle={gb.scrollContent} keyboardShouldPersistTaps="handled">
+      <Image source={logo} style={gb.mark} />
+      <Text style={[gb.word, fontsLoaded && gb.wordFont]}>Club Sense</Text>
+      <Text style={[gb.read, fontsLoaded && gb.readFont]}>Slope 2.1% · Break left · 18 ft</Text>
 
-        <TextInput
-          style={s.input}
+      <View style={gb.form}>
+        <GreenBookInput
           placeholder="Email"
-          placeholderTextColor="#8BA89A"
           autoCapitalize="none"
+          autoComplete="email"
           keyboardType="email-address"
+          textContentType="emailAddress"
           value={email}
           onChangeText={setEmail}
         />
-        <TextInput
-          style={s.input}
+        <GreenBookInput
           placeholder="Password"
-          placeholderTextColor="#8BA89A"
           secureTextEntry
+          autoComplete="password"
+          textContentType="password"
           value={password}
           onChangeText={setPassword}
+          onSubmitEditing={handleLogin}
         />
 
-        <TouchableOpacity style={s.btn} onPress={handleLogin} disabled={busy}>
-          <Text style={s.btnText}>{busy ? 'Signing in...' : 'Sign In'}</Text>
+        <TouchableOpacity style={[gb.btn, busy && gb.btnBusy]} onPress={handleLogin} disabled={busy}>
+          <Text style={gb.btnText}>{busy ? 'Signing in...' : 'Sign In'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={() => router.push('/register')}>
-          <Text style={s.link}>Don't have an account? <Text style={s.linkBold}>Create one</Text></Text>
+          <Text style={gb.link}>No account yet? <Text style={gb.linkBold}>Create one</Text></Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
     </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
+    </GreenBookBackground>
   );
 }
 
 const s = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#2D6A4F' },
-  scrollContent: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  card: { backgroundColor: '#fff', borderRadius: 16, padding: 28, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, elevation: 6 },
-  logoImage: { width: 120, height: 120, alignSelf: 'center', marginBottom: 12, borderRadius: 20 },
-  logo: { fontSize: 32, fontWeight: '800', color: '#2D6A4F', textAlign: 'center' },
-  subtitle: { fontSize: 14, color: '#6B7280', textAlign: 'center', marginBottom: 28 },
-  input: { backgroundColor: '#F0F7F4', borderRadius: 10, padding: 14, fontSize: 16, color: '#1B4332', marginBottom: 14 },
-  btn: { backgroundColor: '#2D6A4F', borderRadius: 10, padding: 16, alignItems: 'center', marginTop: 8, marginBottom: 16 },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  link: { textAlign: 'center', color: '#6B7280', fontSize: 14 },
-  linkBold: { color: '#2D6A4F', fontWeight: '700' },
+  flex: { flex: 1 },
 });
