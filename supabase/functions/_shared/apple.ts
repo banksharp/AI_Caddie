@@ -5,7 +5,6 @@ export interface AppleConfig {
   issuerId: string;
   privateKeyPem: string;
   bundleId: string;
-  sandbox: boolean;
 }
 
 /** Reads App Store Server API config from env. Returns null if anything required is missing. */
@@ -14,7 +13,6 @@ export function getAppleConfig(): AppleConfig | null {
   const issuerId = Deno.env.get('APPLE_ISSUER_ID');
   const rawPrivateKey = Deno.env.get('APPLE_PRIVATE_KEY');
   const bundleId = Deno.env.get('APPLE_BUNDLE_ID');
-  const sandbox = Deno.env.get('APPLE_SANDBOX') === 'true';
 
   if (!keyId || !issuerId || !rawPrivateKey || !bundleId) return null;
 
@@ -23,14 +21,26 @@ export function getAppleConfig(): AppleConfig | null {
     issuerId,
     privateKeyPem: rawPrivateKey.replace(/\\n/g, '\n'),
     bundleId,
-    sandbox,
   };
 }
 
-export function getAppleBaseUrl(config: AppleConfig) {
-  return config.sandbox
-    ? 'https://api.storekit-sandbox.itunes.apple.com'
-    : 'https://api.storekit.itunes.apple.com';
+const APPLE_PRODUCTION_URL = 'https://api.storekit.itunes.apple.com';
+const APPLE_SANDBOX_URL = 'https://api.storekit-sandbox.itunes.apple.com';
+
+/**
+ * GETs an App Store Server API path, trying production first and falling back to sandbox
+ * when production returns 404 (Apple's recommended approach). Real App Store purchases
+ * resolve in production; TestFlight and App Review purchases exist only in sandbox.
+ */
+export async function appleGet(config: AppleConfig, path: string) {
+  const token = await createAppStoreToken(config);
+  const headers = { Authorization: `Bearer ${token}` };
+
+  const production = await fetch(`${APPLE_PRODUCTION_URL}${path}`, { headers });
+  if (production.status !== 404) return production;
+
+  await production.body?.cancel();
+  return await fetch(`${APPLE_SANDBOX_URL}${path}`, { headers });
 }
 
 async function importPKCS8(pem: string) {
