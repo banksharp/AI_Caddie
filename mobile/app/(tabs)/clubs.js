@@ -176,7 +176,8 @@ export default function ClubsScreen() {
 const s = StyleSheet.create({
   center: { flex: 1, backgroundColor: '#F0F7F4', justifyContent: 'center', alignItems: 'center' },
   container: { flex: 1, backgroundColor: '#F0F7F4' },
-  content: { padding: 16, paddingBottom: 40 },
+  // Centered column so cards don't stretch across an iPad screen.
+  content: { padding: 16, paddingBottom: 40, width: '100%', maxWidth: 640, alignSelf: 'center' },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 20, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
 
   viewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },

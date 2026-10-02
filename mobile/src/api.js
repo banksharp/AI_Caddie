@@ -124,13 +124,18 @@ export async function getCourseStrategy(hole_par, hole_length, hazards, hole_sha
 
 // ── Rounds ──
 
-export async function startRound(courseName) {
+export async function startRound(courseName, courseId = null, loopKeys = null) {
   const user = await getSessionUser();
   if (!user) throw new Error('Not authenticated');
 
+  const row = { user_id: user.id, course_name: courseName || null };
+  // Only send the GPS columns when used, so score-only rounds insert exactly as before.
+  if (courseId != null) row.course_id = courseId;
+  if (Array.isArray(loopKeys) && loopKeys.length > 0) row.loop_keys = loopKeys;
+
   const { data, error } = await supabase
     .from('rounds')
-    .insert({ user_id: user.id, course_name: courseName || null })
+    .insert(row)
     .select()
     .single();
 
@@ -138,8 +143,37 @@ export async function startRound(courseName) {
   return {
     round_id: data.id,
     course_name: data.course_name,
+    course_id: data.course_id ?? null,
+    loop_keys: data.loop_keys ?? null,
     started_at: data.started_at,
   };
+}
+
+export async function finishRound(roundId) {
+  const { error } = await supabase
+    .from('rounds')
+    .update({ finished_at: new Date().toISOString() })
+    .eq('id', roundId);
+  if (error) throw new Error(error.message);
+}
+
+// The user's unfinished round started in the last 12 hours, or null.
+export async function getActiveRound() {
+  const user = await getSessionUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const since = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('rounds')
+    .select('*, holes(*)')
+    .eq('user_id', user.id)
+    .is('finished_at', null)
+    .gte('started_at', since)
+    .order('started_at', { ascending: false })
+    .limit(1);
+
+  if (error) throw new Error(error.message);
+  return data && data.length > 0 ? formatRound(data[0]) : null;
 }
 
 export async function addHole(roundId, holeData) {
@@ -221,7 +255,10 @@ function formatRound(r) {
   return {
     round_id: r.id,
     course_name: r.course_name,
+    course_id: r.course_id ?? null,
+    loop_keys: r.loop_keys ?? null,
     started_at: r.started_at,
+    finished_at: r.finished_at ?? null,
     total_score: totalStrokes,
     total_vs_par: totalVsPar,
     holes,

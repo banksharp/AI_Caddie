@@ -85,15 +85,22 @@ export default function HistoryScreen() {
   return (
     <FlatList
       style={s.list}
-      contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      contentContainerStyle={s.listContent}
       data={rounds}
       keyExtractor={(r) => String(r.round_id)}
       renderItem={({ item: r }) => (
         <View style={s.card}>
           <TouchableOpacity onPress={() => toggleExpand(r.round_id)} activeOpacity={0.7}>
             <View style={s.cardHeader}>
-              <View>
-                <Text style={s.courseName}>{r.course_name || 'Unnamed Course'}</Text>
+              <View style={s.titleWrap}>
+                <View style={s.nameRow}>
+                  <Text style={s.courseName} numberOfLines={1}>{r.course_name || 'Unnamed Course'}</Text>
+                  {r.course_id != null && (
+                    <View style={s.gpsBadge}>
+                      <Text style={s.gpsBadgeText}>GPS</Text>
+                    </View>
+                  )}
+                </View>
                 <Text style={s.date}>{new Date(r.started_at).toLocaleDateString()}</Text>
               </View>
               <View style={s.headerRight}>
@@ -153,13 +160,18 @@ export default function HistoryScreen() {
 
 const s = StyleSheet.create({
   list: { flex: 1, backgroundColor: '#F0F7F4' },
+  listContent: { padding: 16, paddingBottom: 40, width: '100%', maxWidth: 640, alignSelf: 'center' },
   center: { flex: 1, backgroundColor: '#F0F7F4', justifyContent: 'center', alignItems: 'center' },
   emptyIcon: { fontSize: 48, marginBottom: 12 },
   emptyText: { fontSize: 20, fontWeight: '700', color: '#1B4332' },
   emptySubtext: { fontSize: 14, color: '#6B7280', marginTop: 4 },
   card: { backgroundColor: '#fff', borderRadius: 14, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 3 },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  courseName: { fontSize: 17, fontWeight: '700', color: '#1B4332' },
+  titleWrap: { flex: 1, marginRight: 10 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  courseName: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: '#1B4332' },
+  gpsBadge: { backgroundColor: '#D8F3DC', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  gpsBadgeText: { fontSize: 10, fontWeight: '800', color: '#2D6A4F', letterSpacing: 0.5 },
   date: { fontSize: 13, color: '#6B7280', marginTop: 2 },
   headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   scoreBadge: { backgroundColor: '#2D6A4F', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'center' },

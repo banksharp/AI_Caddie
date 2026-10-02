@@ -30,7 +30,15 @@
       "expo-secure-store",
       "expo-asset",
       "expo-iap",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Club Sense uses your location during a round to show where you are on the hole and the distance to the green and hazards.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false
+        }
+      ]
     ],
     "extra": {
       "router": {},

@@ -96,3 +96,56 @@ export async function generateStructured(opts: {
   console.warn(`Structured output unavailable (stop_reason=${response.stop_reason})`);
   return { advice: raw || 'Unable to generate advice right now. Please try again.', status: 'success', format: 'text' };
 }
+
+// ── Small validation / bag helpers (used by shot-recommendation) ──
+
+/** Returns `v` if it is one of `allowed` (case-insensitive, trimmed), else null. */
+export function toEnum<T extends string>(v: unknown, allowed: readonly T[]): T | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim().toLowerCase();
+  return allowed.find((a) => a.toLowerCase() === t) ?? null;
+}
+
+/** Clamps a number into [min, max]. NaN becomes `min`. */
+export function clamp(n: number, min: number, max: number): number {
+  if (Number.isNaN(n)) return min;
+  return Math.min(max, Math.max(min, n));
+}
+
+export type BagClub = { name: string; yds: number };
+
+/**
+ * Turns the profile club map into a list of usable clubs, longest first.
+ * Clubs with a missing, non-numeric, zero or negative distance are dropped.
+ */
+export function bagFromClubs(clubs: Record<string, unknown> | null | undefined): BagClub[] {
+  if (!clubs || typeof clubs !== 'object') return [];
+  const bag: BagClub[] = [];
+  for (const [rawName, rawYds] of Object.entries(clubs)) {
+    const name = rawName.trim();
+    const yds = toNumber(rawYds);
+    if (!name || yds === null || yds <= 0) continue;
+    bag.push({ name, yds: Math.round(yds) });
+  }
+  return bag.sort((a, b) => b.yds - a.yds || a.name.localeCompare(b.name));
+}
+
+/**
+ * Maps a (model-provided) club name onto a club in the bag: exact case-insensitive match
+ * first, otherwise the bag club whose distance is nearest to `targetYds`. Returns null only
+ * when the bag is empty, or when there is no match and no usable target.
+ */
+export function nearestClubName(name: unknown, bag: BagClub[], targetYds?: number | null): string | null {
+  if (bag.length === 0) return null;
+  if (typeof name === 'string') {
+    const t = name.trim().toLowerCase();
+    const exact = bag.find((c) => c.name.toLowerCase() === t);
+    if (exact) return exact.name;
+  }
+  if (typeof targetYds !== 'number' || !Number.isFinite(targetYds)) return null;
+  let best = bag[0];
+  for (const c of bag) {
+    if (Math.abs(c.yds - targetYds) < Math.abs(best.yds - targetYds)) best = c;
+  }
+  return best.name;
+}
