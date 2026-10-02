@@ -49,7 +49,18 @@ export async function appleGetIn(config: AppleConfig, environment: AppleEnvironm
   return await fetch(`${baseUrl}${path}`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
+export interface SubscriptionChain {
+  originalTransactionId: string | null;
+  productId: unknown;
+  status: number | null;
+  expires: string | null;
+  autoRenew: boolean | null;
+}
+
 export interface SubscriptionState {
+  environment: AppleEnvironment;
+  /** Every subscription Apple returned for this customer, for diagnostics. */
+  chains: SubscriptionChain[];
   expiresMs: number | null;
   willRenew: boolean;
   /** Apple status: 1 active, 2 expired, 3 billing retry, 4 grace period, 5 revoked. */
@@ -65,18 +76,44 @@ export interface SubscriptionState {
  */
 export async function getSubscriptionState(
   config: AppleConfig,
-  environment: AppleEnvironment,
+  environment: AppleEnvironment | 'auto',
   originalTransactionId: string,
 ): Promise<{ state: SubscriptionState | null; error?: string }> {
-  const r = await appleGetIn(config, environment, `/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`);
+  const path = `/inApps/v1/subscriptions/${encodeURIComponent(originalTransactionId)}`;
+  let r: Response;
+  let env: AppleEnvironment;
+  if (environment === 'auto') {
+    ({ response: r, environment: env } = await appleGet(config, path));
+  } else {
+    r = await appleGetIn(config, environment, path);
+    env = environment;
+  }
   if (!r.ok) return { state: null, error: await r.text() };
 
   const body = await r.json() as {
     data?: Array<{ lastTransactions?: Array<{ originalTransactionId?: string; status?: number; signedTransactionInfo?: string; signedRenewalInfo?: string }> }>;
   };
   const items = (body.data ?? []).flatMap((g) => g.lastTransactions ?? []);
-  const item = items.find((t) => t.originalTransactionId === originalTransactionId) ?? items[0];
-  if (!item?.signedTransactionInfo) return { state: null, error: 'No subscription transactions from Apple' };
+  const chains: SubscriptionChain[] = items.map((t) => {
+    const tx = t.signedTransactionInfo ? decodeJwsPayload(t.signedTransactionInfo) : null;
+    const rn = t.signedRenewalInfo ? decodeJwsPayload(t.signedRenewalInfo) : null;
+    return {
+      originalTransactionId: t.originalTransactionId ?? null,
+      productId: tx?.productId ?? null,
+      status: typeof t.status === 'number' ? t.status : null,
+      expires: typeof tx?.expiresDate === 'number' ? new Date(tx.expiresDate).toISOString() : null,
+      autoRenew: rn?.autoRenewStatus !== undefined ? rn.autoRenewStatus === 1 : null,
+    };
+  });
+
+  // Apple returns every subscription this customer has in the app. Only the one with this
+  // originalTransactionId belongs to the purchase we stored; another chain (e.g. a later
+  // resubscription) must not decide this account's access.
+  const item = items.find((t) => t.originalTransactionId === originalTransactionId)
+    ?? (items.length === 1 ? items[0] : undefined);
+  if (!item?.signedTransactionInfo) {
+    return { state: null, error: `No subscription matching ${originalTransactionId} from Apple` };
+  }
 
   const transaction = decodeJwsPayload(item.signedTransactionInfo);
   if (!transaction) return { state: null, error: 'Could not read transaction from Apple' };
@@ -89,6 +126,8 @@ export async function getSubscriptionState(
 
   return {
     state: {
+      environment: env,
+      chains,
       expiresMs: typeof transaction.expiresDate === 'number' ? transaction.expiresDate : null,
       willRenew,
       status: typeof item.status === 'number' ? item.status : null,

@@ -2,10 +2,13 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseAdmin, getAuthUser } from '../_shared/supabase.ts';
 import {
   getAppleConfig,
-  appleGet,
-  decodeJwsPayload,
+  getSubscriptionState,
   appAccountTokenMismatch,
 } from '../_shared/apple.ts';
+
+// Apple subscription status codes: 1 active, 2 expired, 3 billing retry, 4 grace period, 5 revoked.
+const STATUS_EXPIRED = 2;
+const STATUS_REVOKED = 5;
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -39,56 +42,30 @@ Deno.serve(async (req) => {
       return json({ detail: 'Subscription sync not configured' }, 503);
     }
 
-    const { response: r } = await appleGet(appleConfig, `/inApps/v1/subscriptions/${encodeURIComponent(originalId)}`);
-
-    if (!r.ok) {
-      const err = await r.text();
-      return json({ ok: false, detail: 'Apple subscription lookup failed', raw: err }, 200);
+    const { state, error: stateErr } = await getSubscriptionState(appleConfig, 'auto', originalId);
+    if (!state) {
+      console.log(JSON.stringify({ fn: 'subscription-sync', user: user.id, originalId, error: stateErr }));
+      return json({ ok: false, detail: 'Apple subscription lookup failed', raw: stateErr }, 200);
     }
-
-    const body = await r.json() as {
-      data?: Array<{ lastTransactions?: Array<{ signedTransactionInfo?: string; signedRenewalInfo?: string }> }>;
-    };
-
-    let signedTransactionInfo: string | undefined;
-    let signedRenewalInfo: string | undefined;
-
-    for (const g of body.data ?? []) {
-      const lt = g.lastTransactions;
-      if (Array.isArray(lt) && lt.length > 0) {
-        signedTransactionInfo = lt[0].signedTransactionInfo;
-        signedRenewalInfo = lt[0].signedRenewalInfo;
-        break;
-      }
-    }
-
-    if (!signedTransactionInfo) {
-      return json({ ok: false, detail: 'No subscription transactions from Apple' }, 200);
-    }
-
-    const txPayload = decodeJwsPayload(signedTransactionInfo);
-    if (!txPayload) {
-      return json({ ok: false, detail: 'Could not read transaction from Apple' }, 200);
-    }
+    console.log(JSON.stringify({
+      fn: 'subscription-sync', user: user.id, originalId, environment: state.environment,
+      status: state.status, chains: state.chains,
+    }));
 
     // Purchases made with appAccountToken are bound to the account that bought them.
-    if (appAccountTokenMismatch(txPayload, user.id)) {
+    if (appAccountTokenMismatch(state.transaction, user.id)) {
       return json({ ok: false, detail: 'This App Store purchase belongs to a different account' }, 403);
     }
 
-    if (typeof txPayload.expiresDate !== 'number') {
+    if (!state.expiresMs) {
       return json({ ok: false, detail: 'Could not read expiration from Apple' }, 200);
     }
 
-    const expiresAt = new Date(txPayload.expiresDate);
-
-    let subscriptionWillRenew = true;
-    if (signedRenewalInfo) {
-      const renewalPayload = decodeJwsPayload(signedRenewalInfo);
-      if (renewalPayload?.autoRenewStatus !== undefined) {
-        subscriptionWillRenew = renewalPayload.autoRenewStatus === 1;
-      }
-    }
+    // Expired or refunded subscriptions lose access now, whatever the transaction's date says.
+    const now = Date.now();
+    const ended = state.status === STATUS_EXPIRED || state.status === STATUS_REVOKED;
+    const expiresAt = new Date(ended ? Math.min(state.expiresMs, now) : state.expiresMs);
+    const subscriptionWillRenew = ended ? false : state.willRenew;
 
     const { error: upErr } = await admin
       .from('profiles')
@@ -100,7 +77,7 @@ Deno.serve(async (req) => {
 
     if (upErr) return json({ detail: upErr.message }, 500);
 
-    const active = expiresAt > new Date();
+    const active = !ended && expiresAt.getTime() > now;
     return json({
       ok: true,
       subscription_active: active,
