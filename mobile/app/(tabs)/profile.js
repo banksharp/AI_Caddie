@@ -10,8 +10,6 @@ import { useAuth } from '../../src/AuthContext';
 import { useSubscription } from '../../src/SubscriptionContext';
 import { PaywallScreen } from '../../src/PaywallScreen';
 
-const APPLE_SYNC_INTERVAL_MS = 5 * 60 * 1000;
-
 export default function ProfileScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
@@ -28,17 +26,16 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const hasLoadedRef = useRef(false);
-  const lastSyncRef = useRef(0);
   const managingSubscriptionRef = useRef(false);
 
   /**
    * Show the stored profile immediately, then confirm the subscription with Apple in the
    * background and update the card if anything changed (e.g. canceled in Settings).
-   * Apple is only asked when there is an Apple subscription that the database still shows as
-   * active, and at most every few minutes unless forced (pull-to-refresh, back from Settings).
+   * Apple is asked on every visit when there is an Apple subscription that the database still
+   * shows as active, so the status is as current as before without blocking the screen.
    */
   const loadProfile = useCallback(
-    async ({ forceSync = false } = {}) => {
+    async () => {
       if (!hasLoadedRef.current) setLoading(true);
       let data;
       try {
@@ -53,13 +50,11 @@ export default function ProfileScreen() {
       applySubscription(data);
       setLoading(false);
 
-      const syncDue = forceSync || Date.now() - lastSyncRef.current > APPLE_SYNC_INTERVAL_MS;
-      if (!data.has_apple_subscription || !data.subscription_active || !syncDue) return;
+      if (!data.has_apple_subscription || !data.subscription_active) return;
 
       setSyncing(true);
       try {
         const result = await api.syncSubscription();
-        lastSyncRef.current = Date.now();
         if (result?.ok) {
           const updated = {
             ...data,
@@ -84,7 +79,7 @@ export default function ProfileScreen() {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active' && managingSubscriptionRef.current) {
         managingSubscriptionRef.current = false;
-        loadProfile({ forceSync: true });
+        loadProfile();
       }
     });
     return () => sub.remove();
@@ -99,7 +94,7 @@ export default function ProfileScreen() {
   async function onPullRefresh() {
     setRefreshing(true);
     try {
-      await loadProfile({ forceSync: true });
+      await loadProfile();
     } finally {
       setRefreshing(false);
     }
