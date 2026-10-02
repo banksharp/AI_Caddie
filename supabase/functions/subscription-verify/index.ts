@@ -2,8 +2,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { getSupabaseClient, getSupabaseAdmin, getAuthUser } from '../_shared/supabase.ts';
 import {
   getAppleConfig,
-  getAppleBaseUrl,
-  createAppStoreToken,
+  appleGet,
   decodeJwsPayload,
   appAccountTokenMismatch,
 } from '../_shared/apple.ts';
@@ -30,12 +29,7 @@ Deno.serve(async (req) => {
     const appleConfig = getAppleConfig();
     if (!appleConfig) return json({ detail: 'Subscription verification not configured' }, 503);
 
-    const token = await createAppStoreToken(appleConfig);
-    const baseUrl = getAppleBaseUrl(appleConfig);
-
-    const r = await fetch(`${baseUrl}/inApps/v1/transactions/${encodeURIComponent(transactionId)}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const r = await appleGet(appleConfig, `/inApps/v1/transactions/${encodeURIComponent(transactionId)}`);
 
     if (!r.ok) {
       const err = await r.text();
