@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Linking,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -81,6 +82,48 @@ async function getTransactionIdForCurrentSubscription() {
     : (sub.purchaseToken ?? sub.transactionId ?? null);
 }
 
+const PERIOD_FALLBACK = {
+  [SUBSCRIPTION_PRODUCT_ID_MONTHLY]: 'month',
+  [SUBSCRIPTION_PRODUCT_ID_YEARLY]: 'year',
+};
+
+/** "month", "year", "3 months", ... from the store's period, falling back to the product ID. */
+function periodLabel(product, productId) {
+  const unit = product?.subscriptionPeriodUnitIOS;
+  const count = Number(product?.subscriptionPeriodNumberIOS) || 1;
+  if (unit && unit !== 'empty') return count > 1 ? `${count} ${unit}s` : unit;
+  return PERIOD_FALLBACK[productId] ?? 'period';
+}
+
+/** Small, secondary line describing an introductory offer, or null when there isn't one. */
+function introOfferText(product) {
+  const mode = product?.introductoryPricePaymentModeIOS;
+  if (!mode || mode === 'empty') return null;
+  const count = Number(product.introductoryPriceNumberOfPeriodsIOS) || 1;
+  const unit = product.introductoryPriceSubscriptionPeriodIOS;
+  const length = unit && unit !== 'empty' ? `${count} ${unit}${count > 1 ? 's' : ''}` : null;
+  if (mode === 'free-trial') {
+    return length ? `Includes a ${length} free trial for eligible new subscribers.` : 'Includes a free trial for eligible new subscribers.';
+  }
+  if (product.introductoryPriceIOS) {
+    return `Introductory price of ${product.introductoryPriceIOS}${length ? ` for ${length}` : ''} for eligible new subscribers.`;
+  }
+  return null;
+}
+
+/** Loads the subscription products from the store, keyed by product ID. */
+async function loadProducts() {
+  if (!iap) throw new Error('In-app purchases not available in this build.');
+  await iap.initConnection();
+  const products = await iap.fetchProducts({
+    skus: SUBSCRIPTION_PRODUCT_IDS,
+    type: 'subs',
+  });
+  const byId = {};
+  for (const p of products ?? []) byId[p.id ?? p.productId] = p;
+  return byId;
+}
+
 async function connectAndPurchase(productId, userId) {
   if (!iap) throw new Error('In-app purchases not available in this build.');
   if (!productId) throw new Error('Missing subscription product.');
@@ -148,13 +191,37 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
   const [purchasing, setPurchasing] = useState(false);
   const [restoring, setRestoring] = useState(false);
   const [plan, setPlan] = useState('monthly'); // 'monthly' | 'yearly'
+  const [products, setProducts] = useState(null); // { [productId]: product } once loaded
+  const [productsError, setProductsError] = useState(null);
+
+  const fetchPrices = useCallback(async () => {
+    setProductsError(null);
+    try {
+      const byId = await loadProducts();
+      if (Object.keys(byId).length === 0) throw new Error('No subscriptions found.');
+      setProducts(byId);
+    } catch (err) {
+      setProductsError(err?.message || 'Could not load prices.');
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPrices();
+  }, [fetchPrices]);
+
+  const productIdFor = (p) =>
+    p === 'yearly' ? SUBSCRIPTION_PRODUCT_ID_YEARLY : SUBSCRIPTION_PRODUCT_ID_MONTHLY;
+  const selectedId = productIdFor(plan);
+  const selected = products?.[selectedId];
+  const price = selected?.displayPrice;
+  const period = periodLabel(selected, selectedId);
+  const intro = introOfferText(selected);
+  const busy = purchasing || restoring;
 
   const handleSubscribe = async () => {
     setPurchasing(true);
     try {
-      const productId =
-        plan === 'yearly' ? SUBSCRIPTION_PRODUCT_ID_YEARLY : SUBSCRIPTION_PRODUCT_ID_MONTHLY;
-      const transactionId = await connectAndPurchase(productId, user?.id);
+      const transactionId = await connectAndPurchase(selectedId, user?.id);
       await api.verifySubscription(transactionId);
       await refreshSubscription();
       onSubscribed?.();
@@ -184,7 +251,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
   };
 
   return (
-    <View style={s.container}>
+    <ScrollView style={s.container} contentContainerStyle={s.content}>
       <View style={s.card}>
         <View style={s.iconWrap}>
           <Ionicons name="golf" size={48} color="#2D6A4F" />
@@ -201,44 +268,73 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
         </View>
 
         <View style={s.planRow}>
-          <TouchableOpacity
-            style={[s.planBtn, plan === 'monthly' && s.planBtnActive]}
-            onPress={() => setPlan('monthly')}
-            disabled={purchasing || restoring}
-          >
-            <Text style={[s.planBtnText, plan === 'monthly' && s.planBtnTextActive]}>
-              Monthly
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[s.planBtn, plan === 'yearly' && s.planBtnActive]}
-            onPress={() => setPlan('yearly')}
-            disabled={purchasing || restoring}
-          >
-            <Text style={[s.planBtnText, plan === 'yearly' && s.planBtnTextActive]}>
-              Yearly
-            </Text>
-          </TouchableOpacity>
+          {['monthly', 'yearly'].map((p) => {
+            const active = plan === p;
+            const id = productIdFor(p);
+            const planPrice = products?.[id]?.displayPrice;
+            return (
+              <TouchableOpacity
+                key={p}
+                style={[s.planBtn, active && s.planBtnActive]}
+                onPress={() => setPlan(p)}
+                disabled={busy}
+              >
+                <Text style={[s.planBtnText, active && s.planBtnTextActive]}>
+                  {p === 'yearly' ? 'Yearly' : 'Monthly'}
+                </Text>
+                {planPrice ? (
+                  <>
+                    <Text style={[s.planBtnPrice, active && s.planBtnTextActive]}>{planPrice}</Text>
+                    <Text style={[s.planBtnText, active && s.planBtnTextActive]}>
+                      per {periodLabel(products[id], id)}
+                    </Text>
+                  </>
+                ) : null}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
+        {intro ? <Text style={s.introText}>{intro}</Text> : null}
+        {!products ? (
+          <View style={s.priceStatus}>
+            {productsError ? (
+              <>
+                <Text style={s.priceError}>Couldn't load subscription prices.</Text>
+                <TouchableOpacity onPress={fetchPrices} disabled={busy}>
+                  <Text style={s.retryText}>Try again</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <ActivityIndicator color="#2D6A4F" />
+            )}
+          </View>
+        ) : null}
+
         <TouchableOpacity
-          style={[s.primaryBtn, (purchasing || restoring) && s.btnDisabled]}
+          style={[s.primaryBtn, (busy || !price) && s.btnDisabled]}
           onPress={handleSubscribe}
-          disabled={purchasing || restoring}
+          disabled={busy || !price}
         >
           {purchasing ? (
             <ActivityIndicator color="#fff" />
           ) : (
             <Text style={s.primaryBtnText}>
-              {plan === 'yearly' ? 'Subscribe yearly' : 'Subscribe monthly'}
+              {price ? `Subscribe for ${price}/${period}` : 'Subscribe'}
             </Text>
           )}
         </TouchableOpacity>
 
+        {price ? (
+          <Text style={s.disclosure}>
+            {`${price} is charged to your Apple Account when you confirm the purchase. The subscription renews automatically at ${price} per ${period} unless it is canceled at least 24 hours before the end of the current period. Manage or cancel it in your App Store account settings.`}
+          </Text>
+        ) : null}
+
         <TouchableOpacity
           style={s.restoreBtn}
           onPress={handleRestore}
-          disabled={purchasing || restoring}
+          disabled={busy}
         >
           <Text style={s.restoreBtnText}>{restoring ? 'Restoring...' : 'Restore purchases'}</Text>
         </TouchableOpacity>
@@ -257,7 +353,7 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
           </TouchableOpacity>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -274,6 +370,9 @@ const s = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F0F7F4',
+  },
+  content: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
   },
@@ -327,12 +426,46 @@ const s = StyleSheet.create({
     borderColor: '#2D6A4F',
   },
   planBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#2D6A4F',
   },
   planBtnTextActive: {
     color: '#fff',
+  },
+  planBtnPrice: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#2D6A4F',
+    marginTop: 2,
+  },
+  priceStatus: {
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  introText: {
+    fontSize: 12,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  priceError: {
+    fontSize: 14,
+    color: '#B91C1C',
+    textAlign: 'center',
+  },
+  retryText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2D6A4F',
+    marginTop: 6,
+  },
+  disclosure: {
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 4,
   },
   featureRow: {
     flexDirection: 'row',
