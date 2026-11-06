@@ -283,33 +283,33 @@ export function PaywallScreen({ onSubscribed, title, subtitle }) {
                   {p === 'yearly' ? 'Yearly' : 'Monthly'}
                 </Text>
                 {planPrice ? (
-                  <Text style={[s.planBtnPrice, active && s.planBtnTextActive]}>
-                    {planPrice}/{periodLabel(products[id], id)}
-                  </Text>
+                  <>
+                    <Text style={[s.planBtnPrice, active && s.planBtnTextActive]}>{planPrice}</Text>
+                    <Text style={[s.planBtnText, active && s.planBtnTextActive]}>
+                      per {periodLabel(products[id], id)}
+                    </Text>
+                  </>
                 ) : null}
               </TouchableOpacity>
             );
           })}
         </View>
 
-        <View style={s.priceBlock}>
-          {price ? (
-            <>
-              <Text style={s.billedAmount}>{price}</Text>
-              <Text style={s.billedPeriod}>billed every {period}</Text>
-              {intro ? <Text style={s.introText}>{intro}</Text> : null}
-            </>
-          ) : productsError ? (
-            <>
-              <Text style={s.priceError}>Couldn't load subscription prices.</Text>
-              <TouchableOpacity onPress={fetchPrices} disabled={busy}>
-                <Text style={s.retryText}>Try again</Text>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <ActivityIndicator color="#2D6A4F" />
-          )}
-        </View>
+        {intro ? <Text style={s.introText}>{intro}</Text> : null}
+        {!products ? (
+          <View style={s.priceStatus}>
+            {productsError ? (
+              <>
+                <Text style={s.priceError}>Couldn't load subscription prices.</Text>
+                <TouchableOpacity onPress={fetchPrices} disabled={busy}>
+                  <Text style={s.retryText}>Try again</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <ActivityIndicator color="#2D6A4F" />
+            )}
+          </View>
+        ) : null}
 
         <TouchableOpacity
           style={[s.primaryBtn, (busy || !price) && s.btnDisabled]}
@@ -426,41 +426,28 @@ const s = StyleSheet.create({
     borderColor: '#2D6A4F',
   },
   planBtnText: {
-    fontSize: 15,
-    fontWeight: '800',
+    fontSize: 13,
+    fontWeight: '600',
     color: '#2D6A4F',
   },
   planBtnTextActive: {
     color: '#fff',
   },
   planBtnPrice: {
-    fontSize: 13,
-    fontWeight: '600',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#2D6A4F',
     marginTop: 2,
   },
-  priceBlock: {
+  priceStatus: {
     alignItems: 'center',
-    minHeight: 64,
-    justifyContent: 'center',
     marginBottom: 14,
-  },
-  billedAmount: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: '#1B4332',
-  },
-  billedPeriod: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1B4332',
-    marginTop: 2,
   },
   introText: {
     fontSize: 12,
     color: '#6B7280',
     textAlign: 'center',
-    marginTop: 6,
+    marginBottom: 12,
   },
   priceError: {
     fontSize: 14,
